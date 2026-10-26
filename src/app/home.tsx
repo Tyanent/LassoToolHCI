@@ -9,7 +9,14 @@ const height = 900
 const width = 380
 
 type Point = { x: number; y: number };
-type AppIcon = { id: string; label: string; x: number; y: number; size: number };
+type AppIcon = { 
+  id: string; 
+  label: string; 
+  x: number; 
+  y: number; 
+  size: number;
+  groupId?: string;
+ };
 
 // const Xspacing = 100; // Spacing between app icons center
 // const Yspacing = 110; // Spacing between app icons center
@@ -39,7 +46,7 @@ const Xspacing = 100;
 const Yspacing = 100;
 const numColumns = 4;
 
-const labels = ["Mail","Photos","Music","Maps","Camera","Notes","Clock","Weather","Settings","Phone"];
+var labels = ["Mail","Photos","Music","Maps","Camera","Notes","Clock","Weather","Settings","Phone"];
 
 const APPS: AppIcon[] = labels.map((label, i) => {
   const col = i % numColumns;
@@ -67,6 +74,7 @@ function pointInPolygon(point: Point, polygon: Point[]): boolean {
   }
   return inside;
 }
+
 
 type JigglingAppIconProps = {
   app: AppIcon;
@@ -145,6 +153,9 @@ export default function Index() {
   const [paths, setPaths] = useState<Point[][]>([]);
   const [currentPath, setCurrentPath] = useState<Point[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [apps, setApps] = useState<AppIcon[]>(APPS);
+  const groupIdCounter = useRef(0); // Counter to generate unique group IDs
+
 
   const toSvgPath = (points: Point[]) =>
     points
@@ -163,7 +174,7 @@ export default function Index() {
 
         if (prev.length >= 3) {
           // Test each app's center against the lasso polygon
-          const inside = APPS.filter((app) =>
+          const inside = apps.filter((app) => !app.groupId).filter((app) =>
             pointInPolygon(
               { x: app.x + app.size / 2, y: app.y + app.size / 2 },
               prev
@@ -187,6 +198,33 @@ export default function Index() {
     setCurrentPath([]);
     setSelectedIds([]);
   };
+//Group selected apps
+  const groupSelectedApps = () => {
+      const selectedApps = apps.filter((app) => selectedIds.includes(app.id));
+      if (selectedApps.length <= 1){
+        console.log("Not enough apps selected to form a group.");
+        return;
+      } 
+
+      const groupId = `group-${groupIdCounter.current++}`; // groupID increments from 1
+      console.log(`Created group ${groupId} with`, selectedIds);
+
+      setApps((prev) =>
+        prev.map((app) =>
+          selectedIds.includes(app.id) ? { ...app, groupId } : app
+        )
+      );
+      setSelectedIds([]);
+      
+    };
+//Reset apps
+  const ungroupSelectedApps = () => {
+    setApps((prev) =>
+      prev.map((app) => ({ ...app, groupId: undefined }))
+    );
+    setSelectedIds([]);
+    groupIdCounter.current = 0; // Reset the group ID counter
+  }
   //Rendering the app icons and the lasso selection path
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -198,13 +236,15 @@ export default function Index() {
         />
 
         {/* Placeholder app icons */}
-        {APPS.map((app) => (
-          <JigglingAppIcon
-            key={app.id}
-            app={app}
-            selected={selectedIds.includes(app.id)}
-          />
-        ))}
+        {apps
+          .filter((app) => !app.groupId)
+          .map((app) => (
+            <JigglingAppIcon
+              key={app.id}
+              app={app}
+              selected={selectedIds.includes(app.id)}
+            />
+          ))} 
         {/* {APPS.map((app) => {
           const selected = selectedIds.includes(app.id);
           return (
@@ -260,11 +300,24 @@ export default function Index() {
             </Svg>
           </View>
         </GestureDetector>
-        <TouchableOpacity 
-        style={styles.clearButton} 
-        onPress={handleClearButtonClick}>
-        <Text style={styles.clearButtonText}>Clear Selection</Text>
-        </TouchableOpacity>
+        {/* Buttons */}
+        <View style = {{ flexDirection: "row", justifyContent: "space-between", width: "100%", paddingHorizontal: 20, marginTop: 10 }}>
+          <TouchableOpacity 
+          style={styles.Button} 
+          onPress={handleClearButtonClick}>
+          <Text style={styles.ButtonText}>Clear Selection</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+          style={styles.Button} 
+          onPress={() => groupSelectedApps()}>
+          <Text style={styles.ButtonText}>Group Selected</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+          style={styles.Button} 
+          onPress={() => ungroupSelectedApps()}>
+          <Text style={styles.ButtonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </GestureHandlerRootView>
   );
@@ -282,18 +335,20 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     borderWidth: 1,
   },
-  clearButton: {
+  Button: {
     marginTop: 10,
     backgroundColor: "black",
     paddingVertical: 20,
     paddingHorizontal: 20,
     borderRadius: 5,
     alignItems: "center",
+    width: "30%",
   },
-  clearButtonText: { 
+  ButtonText: { 
     color: "white", 
     fontSize: 16, 
-    fontWeight: "bold" 
+    fontWeight: "bold" ,
+    textAlign: "center",
   },
  app: {
     position: "absolute",
@@ -302,5 +357,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundImage: require("../../assets/LassoToolAssets/app.png"),
   },
+  // groupButton: {
+  //   marginTop: 10,
+  //   backgroundColor: "black",
+  //   paddingVertical: 20,
+  //   paddingHorizontal: 20,
+  //   borderRadius: 5,
+  //   alignItems: "center",
+  // },
+  // groupButtonText: {
+  //   color: "white",
+  //   fontSize: 16,
+  //   fontWeight: "bold",
+  // },
   
 });
