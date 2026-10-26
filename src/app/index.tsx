@@ -1,26 +1,57 @@
 import { Image } from "expo-image";
-import { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from "react-native-gesture-handler";
 import { Path, Svg } from "react-native-svg";
 
-const height = 900
+//SVG container dimensions
+const height = 900 
 const width = 380
+
 type Point = { x: number; y: number };
 type AppIcon = { id: string; label: string; x: number; y: number; size: number };
 
-const APPS: AppIcon[] = [
-  { id: "1", label: "Mail", x: 40, y: 120, size: 64 },
-  { id: "2", label: "Photos", x: 140, y: 120, size: 64 },
-  { id: "3", label: "Music", x: 240, y: 120, size: 64 },
-  { id: "4", label: "Maps", x: 40, y: 230, size: 64 },
-  { id: "5", label: "Camera", x: 140, y: 230, size: 64 },
-  { id: "6", label: "Notes", x: 240, y: 230, size: 64 },
-  { id: "7", label: "Clock", x: 40, y: 340, size: 64 },
-  { id: "8", label: "Weather", x: 140, y: 340, size: 64 },
-  { id: "9", label: "Settings", x: 240, y: 340, size: 64 },
-  { id: "10", label: "Phone", x: 40, y: 440, size: 64 },
-];
+// const Xspacing = 100; // Spacing between app icons center
+// const Yspacing = 110; // Spacing between app icons center
+// const iconSize = 64; // Size of each app icon
+// const numColumns = 3; // Number of columns in the grid (4 icons per row)
+// const numRows = 5; // Number of rows in the grid (6 icons per column)
+
+
+// const APPS: AppIcon[] = [
+//   { id: "1", label: "Mail", x: 40, y: 120, size: iconSize },
+//   { id: "2", label: "Photos", x: 140, y: 120, size: iconSize },
+//   { id: "3", label: "Music", x: 240, y: 120, size: iconSize },
+//   { id: "4", label: "Maps", x: 40, y: 230, size: iconSize },
+//   { id: "5", label: "Camera", x: 140, y: 230, size: iconSize },
+//   { id: "6", label: "Notes", x: 240, y: 230, size: iconSize },
+//   { id: "7", label: "Clock", x: 40, y: 340, size: iconSize },
+//   { id: "8", label: "Weather", x: 140, y: 340, size: iconSize },
+//   { id: "9", label: "Settings", x: 240, y: 340, size: iconSize },
+//   { id: "10", label: "Phone", x: 40, y: 440, size: iconSize },
+// ];
+
+//Dynamic Adjustment for icon positions based on the number of columns and rows
+const startX = 15;
+const startY = 40;
+const iconSize = 64;
+const Xspacing = 100;
+const Yspacing = 100;
+const numColumns = 4;
+
+const labels = ["Mail","Photos","Music","Maps","Camera","Notes","Clock","Weather","Settings","Phone"];
+
+const APPS: AppIcon[] = labels.map((label, i) => {
+  const col = i % numColumns;
+  const row = Math.floor(i / numColumns);
+  return {
+    id: String(i + 1),
+    label,
+    x: startX + col * Xspacing,
+    y: startY + row * Yspacing,
+    size: iconSize,
+  };
+});
 
 function pointInPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
@@ -36,6 +67,79 @@ function pointInPolygon(point: Point, polygon: Point[]): boolean {
   }
   return inside;
 }
+
+type JigglingAppIconProps = {
+  app: AppIcon;
+  selected: boolean;
+};
+
+// JigglingAppIcon component to animate the app icons when selected
+function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
+  const rotation = useRef(new Animated.Value(0)).current;
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    if (selected) {
+      animRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(rotation, {
+            toValue: 2,
+            duration: 100,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+          Animated.timing(rotation, {
+            toValue: -2,
+            duration: 100,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animRef.current.start();
+    } else {
+      animRef.current?.stop();
+      rotation.setValue(0);
+    }
+
+    return () => {
+      animRef.current?.stop();
+    };
+  }, [selected, rotation]);
+
+  const rotate = rotation.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ["-2deg", "2deg"],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.app, // Apply the app style
+        {
+          left: app.x,
+          top: app.y,
+          width: app.size,
+          height: app.size,
+          shadowColor: "#000",
+          shadowOffset: selected
+            ? { width: 0, height: 2 }
+            : { width: 0, height: 0 },
+          shadowOpacity: selected ? 0.8 : 0.3,
+          shadowRadius: selected ? 4 : 2,
+          elevation: 5,
+          transform: [{ rotate }],
+        },
+      ]}
+    >
+      <Image
+        source={require("../../assets/LassoToolAssets/app.png")}
+        style={{ width: "100%", height: "100%" }}
+      />
+    </Animated.View>
+  );
+}
+
 
 export default function Index() {
   const [paths, setPaths] = useState<Point[][]>([]);
@@ -54,9 +158,9 @@ export default function Index() {
     onUpdate: (e) => {
       setCurrentPath((prev) => [...prev, { x: e.x, y: e.y }]);
     },
-    onDeactivate: () => {   // 
+    onDeactivate: () => {   // user stops dragging
      setCurrentPath((prev) => {
-        // Need at least 3 points to form a closed shape
+
         if (prev.length >= 3) {
           // Test each app's center against the lasso polygon
           const inside = APPS.filter((app) =>
@@ -67,23 +171,23 @@ export default function Index() {
           ).map((app) => app.id);
 
           console.log("Selected app IDs:", selectedIds);
-
+          
           // setSelectedIds(inside);
           setSelectedIds((prev) => [...new Set([...prev, ...inside])]);
           setPaths((old) => [...old, prev]);
-          setPaths([]);
+          setPaths([]); // Clear the selection path after selection
         }
         return [];
       });
     }
   });
-
+//Clear selected
   const handleClearButtonClick = () => {
     setPaths([]);
     setCurrentPath([]);
     setSelectedIds([]);
   };
-
+  //Rendering the app icons and the lasso selection path
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
@@ -94,7 +198,14 @@ export default function Index() {
         />
 
         {/* Placeholder app icons */}
-        {APPS.map((app) => {
+        {APPS.map((app) => (
+          <JigglingAppIcon
+            key={app.id}
+            app={app}
+            selected={selectedIds.includes(app.id)}
+          />
+        ))}
+        {/* {APPS.map((app) => {
           const selected = selectedIds.includes(app.id);
           return (
             <View
@@ -106,13 +217,18 @@ export default function Index() {
                   top: app.y,
                   width: app.size,
                   height: app.size,
-                  backgroundColor: selected ? "#007AFF" : "#E0E0E0",
+                  shadowColor: "#000",
+                  shadowOffset: selected? { width: 0, height: 2 }: { width: 0, height: 0 },
+                  shadowOpacity: selected ? 0.8 : 0.3,
+                  shadowRadius: selected ? 4 : 2,
+                  elevation: 5          
                 },
               ]}
             >
+            <Image source={require("../../assets/LassoToolAssets/app.png")}  style ={{ width: "100%", height: "100%" }}/>
             </View>
           );
-        })}
+        })} */}
 
         <GestureDetector gesture={drag}>
           <View style={styles.svgContainer}>
