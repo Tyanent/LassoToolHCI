@@ -6,7 +6,7 @@ import { Path, Svg } from "react-native-svg";
 
 //SVG container dimensions
 const height = 900 
-const width = 380
+const width = 400
 
 type Point = { x: number; y: number };
 type AppIcon = { 
@@ -16,7 +16,19 @@ type AppIcon = {
   y: number; 
   size: number;
   groupId?: string;
+  containerHeight: number;
  };
+
+type Folder = {
+  id: string; // groupId
+  label: string;
+  x: number;
+  y: number;
+  size: number;
+  containerHeight: number;
+  appIds: string[];
+  open: boolean;
+}
 
 // const Xspacing = 100; // Spacing between app icons center
 // const Yspacing = 110; // Spacing between app icons center
@@ -45,8 +57,15 @@ const iconSize = 64;
 const Xspacing = 100;
 const Yspacing = 100;
 const numColumns = 4;
+const LabelHeight = 15;
 
-var labels = ["Mail","Photos","Music","Maps","Camera","Notes","Clock","Weather","Settings","Phone"];
+const labels = [
+  "Mail", "Photos", "Music", "Maps",
+  "Camera", "Notes", "Clock", "Weather",
+  "Settings", "Phone", "Wallet", "Messages",
+  "Calendar", "Reminders", "Stocks", "Books",
+  "Podcasts", "Health", "Files", "Bank",
+];
 
 const APPS: AppIcon[] = labels.map((label, i) => {
   const col = i % numColumns;
@@ -57,6 +76,7 @@ const APPS: AppIcon[] = labels.map((label, i) => {
     x: startX + col * Xspacing,
     y: startY + row * Yspacing,
     size: iconSize,
+    containerHeight: iconSize + LabelHeight,
   };
 });
 
@@ -128,7 +148,17 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           left: app.x,
           top: app.y,
           width: app.size,
-          height: app.size,
+          height: app.containerHeight,
+          transform: [{ rotate }],
+        },
+      ]}
+    >
+      <Image
+        source={require("../../assets/LassoToolAssets/app.png")}
+        style={{ 
+          width: app.size, 
+          height: app.size, 
+          borderRadius: 14,
           shadowColor: "#000",
           shadowOffset: selected
             ? { width: 0, height: 2 }
@@ -136,18 +166,72 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           shadowOpacity: selected ? 0.8 : 0.3,
           shadowRadius: selected ? 4 : 2,
           elevation: 5,
-          transform: [{ rotate }],
-        },
-      ]}
-    >
-      <Image
-        source={require("../../assets/LassoToolAssets/app.png")}
-        style={{ width: "100%", height: "100%" }}
+        }}
       />
+      <Text
+        numberOfLines={1}
+        style={{
+          width: app.size,
+          height: LabelHeight,
+          lineHeight: LabelHeight,
+          fontSize: 12,
+          textAlign: "center",
+          color: "white",
+          textShadowColor: "rgba(0,0,0,0.6)",
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 2,
+        }}
+      >
+        {app.label}
+      </Text>
+
     </Animated.View>
   );
 }
 
+function FolderTile({
+  folder,
+  apps,
+  onOpen,
+}: {
+  folder: Folder;
+  apps: AppIcon[];
+  onOpen: () => void;
+}) {
+  // Show up to 9 mini icons in a 3×3 preview inside the folder tile
+  const preview = folder.appIds
+    .map((id) => apps.find((a) => a.id === id))
+    .filter(Boolean)
+    .slice(0, 9) as AppIcon[];
+
+  return (
+    <View
+      style={[
+        styles.folderWrapper,
+        { left: folder.x, top: folder.y, width: folder.size },
+      ]}
+    >
+      <TouchableOpacity
+        style={[styles.folderTile, { width: folder.size, height: folder.size }]}
+        onPress={onOpen}
+      >
+        <View style={styles.folderGrid}>
+          {preview.map((app) => (
+            <View key={app.id} style={styles.folderMini}>
+              <Image
+                source={require("../../assets/LassoToolAssets/app.png")}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </View>
+          ))}
+        </View>
+      </TouchableOpacity>
+      <Text numberOfLines={1} style={styles.folderLabel}>
+        {folder.label}
+      </Text>
+    </View>
+  );
+}
 
 export default function Index() {
   const [paths, setPaths] = useState<Point[][]>([]);
@@ -155,7 +239,7 @@ export default function Index() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [apps, setApps] = useState<AppIcon[]>(APPS);
   const groupIdCounter = useRef(0); // Counter to generate unique group IDs
-
+  const [folders, setFolders] = useState<Folder[]>([]);
 
   const toSvgPath = (points: Point[]) =>
     points
@@ -214,6 +298,23 @@ export default function Index() {
           selectedIds.includes(app.id) ? { ...app, groupId } : app
         )
       );
+
+      const firstApp = selectedApps[0];
+      if (!firstApp) return;
+
+      const newFolder: Folder = {
+        id: groupId,
+        label: `Folder ${groupIdCounter.current}`,
+        x: firstApp.x,
+        y: firstApp.y,
+        size: iconSize,
+        containerHeight: iconSize + LabelHeight,
+        appIds: selectedIds,
+        open: false,
+      };
+
+      console.log("New folder created:", newFolder, "at position:", newFolder.x, newFolder.y, "using", firstApp.id, "as reference.");
+      setFolders((prev) => [...prev, newFolder]);
       setSelectedIds([]);
       
     };
@@ -223,6 +324,7 @@ export default function Index() {
       prev.map((app) => ({ ...app, groupId: undefined }))
     );
     setSelectedIds([]);
+    setFolders([])
     groupIdCounter.current = 0; // Reset the group ID counter
   }
   //Rendering the app icons and the lasso selection path
@@ -245,6 +347,7 @@ export default function Index() {
               selected={selectedIds.includes(app.id)}
             />
           ))} 
+          
         {/* {APPS.map((app) => {
           const selected = selectedIds.includes(app.id);
           return (
@@ -269,7 +372,22 @@ export default function Index() {
             </View>
           );
         })} */}
-
+        {/* Render Folder */}
+        {folders.map((folder) => (
+            <FolderTile
+              key={folder.id}
+              folder={folder}
+              apps={apps}
+              onOpen={() =>
+                setFolders((prev) =>
+                  prev.map((f) =>
+                    f.id === folder.id ? { ...f, open: !f.open } : f
+                  )
+                )
+              }
+            />
+        ))}
+        {/* Lasso Selection Rendering */}
         <GestureDetector gesture={drag}>
           <View style={styles.svgContainer}>
             <Svg height={height * 0.7} width={width}>
@@ -300,6 +418,7 @@ export default function Index() {
             </Svg>
           </View>
         </GestureDetector>
+        
         {/* Buttons */}
         <View style = {{ flexDirection: "row", justifyContent: "space-between", width: "100%", paddingHorizontal: 20, marginTop: 10 }}>
           <TouchableOpacity 
@@ -330,10 +449,7 @@ const styles = StyleSheet.create({
   },
   svgContainer: {
     height: height * 0.7,
-    width,
-    borderColor: "black",
     backgroundColor: "transparent",
-    borderWidth: 1,
   },
   Button: {
     marginTop: 10,
@@ -352,23 +468,49 @@ const styles = StyleSheet.create({
   },
  app: {
     position: "absolute",
-    borderRadius: 14,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     backgroundImage: require("../../assets/LassoToolAssets/app.png"),
   },
-  // groupButton: {
-  //   marginTop: 10,
-  //   backgroundColor: "black",
-  //   paddingVertical: 20,
-  //   paddingHorizontal: 20,
-  //   borderRadius: 5,
-  //   alignItems: "center",
-  // },
-  // groupButtonText: {
-  //   color: "white",
-  //   fontSize: 16,
-  //   fontWeight: "bold",
-  // },
+  folderWrapper: {
+  position: "absolute",
+  alignItems: "center",
+  },
+  folderTile: {
+    borderRadius: 14,
+    backgroundColor: "rgba(99, 161, 247, 0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  folderGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    gap: 3,
+  },
+  folderMini: {
+    width: 13,
+    height: 13,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  folderLabel: {
+    width: iconSize,
+    height: LabelHeight,
+    lineHeight: LabelHeight,
+    fontSize: 12,
+    textAlign: "center",
+    color: "white",
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   
 });
