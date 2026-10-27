@@ -21,7 +21,7 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 4. Click Meatball Menu (3 dots) > Select Device Emulation 
 <img width="732" height="935" alt="Image" src="https://github.com/user-attachments/assets/b32be5b3-efac-4987-a074-e98dab7b5011" />
 
-1. Apply Iphone 15 Pro Preset
+5. Apply Iphone 15 Pro Preset
 <img width="247" height="400" alt="Image" src="https://github.com/user-attachments/assets/8d8e6a12-072a-47c0-a0b7-4ec91bfac434" />
 <img width="1455" height="335" alt="Image" src="https://github.com/user-attachments/assets/54760132-ace7-47b9-8335-998b01e6f437" />
 
