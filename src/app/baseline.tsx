@@ -1,15 +1,15 @@
 import { Image } from "expo-image";
 import { useRef, useState } from "react";
 import {
-    Animated,
-    StyleSheet,
-    Text,
-    View,
+  Animated,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import {
-    Gesture,
-    GestureDetector,
-    GestureHandlerRootView,
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     width: 48,
     height: 48,
-    justifyContent: "center",
+    
     alignItems: "center",
     gap: 3,
   },

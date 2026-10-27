@@ -15,6 +15,15 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```bash
    npx expo start
    ```
+3. Once the app is started, Select localhost link in the terminal output
+   
+
+4. Click Meatball Menu (3 dots) > Select Device Emulation 
+![alt text](img1.png)
+
+1. Apply Iphone 15 Pro Preset
+![alt text](img2.png)
+![alt text](img3.png)
 
 In the output, you'll find options to open the app in a
 
