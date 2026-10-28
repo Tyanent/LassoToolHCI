@@ -33,7 +33,7 @@ function HeaderBar() {
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.navText}>index</Text>
+          <Text style={styles.navText}>Lasso</Text>
         </Pressable>
         <Pressable
           onPress={() => router.navigate("/baseline")}
@@ -45,6 +45,18 @@ function HeaderBar() {
         >
           <Text style={styles.navText}>Baseline</Text>
         </Pressable>
+
+        <Pressable
+          onPress={() => router.navigate("/experiment")}
+          style={({ pressed }) => [
+            styles.navButton,
+            current === "experiment" && styles.navButtonActive,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.navText}>Experiment</Text>
+        </Pressable>
+
       </View>
     </View>
   );
@@ -59,6 +71,7 @@ export default function RootLayout() {
     >
       <Stack.Screen name="index" options={{ title: "Index" }} />
       <Stack.Screen name="baseline" options={{ title: "Baseline" }} />
+      <Stack.Screen name="experiment" options={{ title: "Experiment" }} />
     </Stack>
   );
 }
