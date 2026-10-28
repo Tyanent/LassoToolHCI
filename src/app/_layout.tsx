@@ -26,14 +26,14 @@ function HeaderBar() {
 
       <View style={styles.right}>
         <Pressable
-          onPress={() => router.navigate("/home")}
+          onPress={() => router.navigate("/")}
           style={({ pressed }) => [
             styles.navButton,
-            current === "home" && styles.navButtonActive,
+            current === undefined && styles.navButtonActive,
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.navText}>Home</Text>
+          <Text style={styles.navText}>index</Text>
         </Pressable>
         <Pressable
           onPress={() => router.navigate("/baseline")}
@@ -57,7 +57,7 @@ export default function RootLayout() {
         header: () => <HeaderBar />,
       }}
     >
-      <Stack.Screen name="home" options={{ title: "Home" }} />
+      <Stack.Screen name="index" options={{ title: "Index" }} />
       <Stack.Screen name="baseline" options={{ title: "Baseline" }} />
     </Stack>
   );
