@@ -21,7 +21,7 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 4. Click Meatball Menu (3 dots) > Select Device Emulation 
 ![alt text](assets\LassoToolAssets\img1.png)
 
-1. Apply Iphone 15 Pro Preset
+5. Apply Iphone 15 Pro Preset
 ![alt text](assets\LassoToolAssets\img2.png)
 ![alt text](assets\LassoToolAssets\img3.png)
 

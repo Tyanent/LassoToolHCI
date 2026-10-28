@@ -12,6 +12,7 @@ import {
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
+import { completeTask } from "./experimentSession";
 
 // ---------- Layout ----------
 const height = 900;
@@ -242,59 +243,85 @@ export default function Index() {
     setHoverTarget(target);
   };
 
-  const handleDragEnd = (id: string, absX: number, absY: number) => {
-    if (absX >= 0 && absY >= 0) {
-      const target = findDropTarget(absX, absY, apps, folders, id);
+  const handleDragEnd = async (id: string, absX: number, absY: number) => {
+  if (absX >= 0 && absY >= 0) {
+    const target = findDropTarget(absX, absY, apps, folders, id);
 
-      if (target?.kind === "app") {
-        // Create a new folder containing both apps, at the target's position
-        const targetApp = apps.find((a) => a.id === target.id);
-        const dragged = apps.find((a) => a.id === id);
-        if (targetApp && dragged) {
-          const groupId = `group-${groupIdCounter.current++}`;
-          setApps((prev) =>
-            prev.map((a) =>
-              a.id === dragged.id || a.id === targetApp.id
-                ? { ...a, groupId }
-                : a
-            )
-          );
-          setFolders((prev) => [
-            ...prev,
-            {
-              id: groupId,
-              label: `Folder ${groupIdCounter.current}`,
-              x: targetApp.x,
-              y: targetApp.y,
-              size: iconSize,
-              containerHeight,
-              appIds: [dragged.id, targetApp.id],
-            },
-          ]);
-        }
-      } else if (target?.kind === "folder") {
-        // Add the dragged app to the existing folder
+    let nextFolders = folders;
+
+    if (target?.kind === "app") {
+      const targetApp = apps.find((a) => a.id === target.id);
+      const dragged = apps.find((a) => a.id === id);
+      if (targetApp && dragged) {
+        const groupId = `group-${groupIdCounter.current++}`;
         setApps((prev) =>
           prev.map((a) =>
-            a.id === id ? { ...a, groupId: target.id } : a
+            a.id === dragged.id || a.id === targetApp.id
+              ? { ...a, groupId }
+              : a
           )
         );
-        setFolders((prev) =>
-          prev.map((f) =>
-            f.id === target.id
-              ? { ...f, appIds: [...f.appIds, id] }
-              : f
-          )
-        );
+
+        // ← build nextFolders locally
+        nextFolders = [
+          ...folders,
+          {
+            id: groupId,
+            label: `Folder ${groupIdCounter.current}`,
+            x: targetApp.x,
+            y: targetApp.y,
+            size: iconSize,
+            containerHeight,
+            appIds: [dragged.id, targetApp.id],
+          },
+        ];
+        setFolders(nextFolders);   // ← pass the same array to state
       }
-      // If target is null, the app snaps back to its original position
-      // (we haven't changed its x/y, so nothing to undo)
+    } else if (target?.kind === "folder") {
+      setApps((prev) =>
+        prev.map((a) =>
+          a.id === id ? { ...a, groupId: target.id } : a
+        )
+      );
+
+      // ← build nextFolders locally
+      nextFolders = folders.map((f) =>
+        f.id === target.id
+          ? { ...f, appIds: [...f.appIds, id] }
+          : f
+      );
+      setFolders(nextFolders);   // ← pass the same array to state
     }
 
-    setDraggingId(null);
-    setDragPos(null);
-    setHoverTarget(null);
-  };
+    // ---- Completion check ----
+    // Now nextFolders reflects the post-drop state.
+    if (nextFolders.length >= 5) {
+      const taskComplete = nextFolders.every(
+        (f) => f.appIds.length >= 4
+      );
+      const totalGrouped = nextFolders.reduce(
+        (s, f) => s + f.appIds.length,
+        0
+      );
+      const allAppsGrouped = totalGrouped === 20;
+      const wrongStructure = allAppsGrouped && !taskComplete;
+
+      if (taskComplete || wrongStructure) {
+        const allGroupedIds = nextFolders.flatMap((f) => f.appIds);
+        const log = await completeTask(
+          allGroupedIds,
+          "20",
+          taskComplete ? "success" : "failure"
+        );
+        if (log) console.log("Baseline task logged:", log);
+      }
+    }
+  }
+
+  setDraggingId(null);
+  setDragPos(null);
+  setHoverTarget(null);
+};
 
   // ---------- Derived ----------
   const visibleApps = apps.filter((a) => !a.groupId);

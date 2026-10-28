@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from "react-native-gesture-handler";
 import { Path, Svg } from "react-native-svg";
+import { completeTask } from "./experimentSession";
+
 
 //SVG container dimensions
 const height = 900 
@@ -29,26 +31,6 @@ type Folder = {
   appIds: string[];
   open: boolean;
 }
-
-// const Xspacing = 100; // Spacing between app icons center
-// const Yspacing = 110; // Spacing between app icons center
-// const iconSize = 64; // Size of each app icon
-// const numColumns = 3; // Number of columns in the grid (4 icons per row)
-// const numRows = 5; // Number of rows in the grid (6 icons per column)
-
-
-// const APPS: AppIcon[] = [
-//   { id: "1", label: "Mail", x: 40, y: 120, size: iconSize },
-//   { id: "2", label: "Photos", x: 140, y: 120, size: iconSize },
-//   { id: "3", label: "Music", x: 240, y: 120, size: iconSize },
-//   { id: "4", label: "Maps", x: 40, y: 230, size: iconSize },
-//   { id: "5", label: "Camera", x: 140, y: 230, size: iconSize },
-//   { id: "6", label: "Notes", x: 240, y: 230, size: iconSize },
-//   { id: "7", label: "Clock", x: 40, y: 340, size: iconSize },
-//   { id: "8", label: "Weather", x: 140, y: 340, size: iconSize },
-//   { id: "9", label: "Settings", x: 240, y: 340, size: iconSize },
-//   { id: "10", label: "Phone", x: 40, y: 440, size: iconSize },
-// ];
 
 //Dynamic Adjustment for icon positions based on the number of columns and rows
 const startX = 15;
@@ -283,7 +265,7 @@ export default function Index() {
     setSelectedIds([]);
   };
 //Group selected apps
-  const groupSelectedApps = () => {
+  const groupSelectedApps = async () => {
       const selectedApps = apps.filter((app) => selectedIds.includes(app.id));
       if (selectedApps.length <= 1){
         console.log("Not enough apps selected to form a group.");
@@ -313,10 +295,37 @@ export default function Index() {
         open: false,
       };
 
+
+      
       console.log("New folder created:", newFolder, "at position:", newFolder.x, newFolder.y, "using", firstApp.id, "as reference.");
       setFolders((prev) => [...prev, newFolder]);
       setSelectedIds([]);
+      //Completion Check
       
+        if (folders.length + 1 >= 5) {
+        const nextFolders = [...folders, newFolder];
+
+        const taskComplete =
+          nextFolders.length >= 5 &&
+          nextFolders.every((f) => f.appIds.length >= 4);
+
+        const totalGrouped = nextFolders.reduce(
+          (s, f) => s + f.appIds.length,
+          0
+        );
+        const allAppsGrouped = totalGrouped === 20;
+        const wrongStructure = !taskComplete;
+
+        if (taskComplete || wrongStructure) {
+          const allGroupedIds = nextFolders.flatMap((f) => f.appIds);
+          const log = await completeTask(
+            allGroupedIds,
+            "20",
+            taskComplete ? "success" : "failure"
+          );
+          if (log) console.log("Lasso task logged:", log);
+        }
+      }
     };
 //Reset apps
   const ungroupSelectedApps = () => {
