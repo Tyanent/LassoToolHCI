@@ -34,7 +34,13 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Running the Experiment 
 
+1. To run the experiment go to the experiment tab on the prototype
+   
+2. Follow the instructions and start the task
+   
+3. After completing the task, export csv to keep a record of the results.
 
 
 
