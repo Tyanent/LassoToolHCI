@@ -1,11 +1,12 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useEffect, useState } from "react";
-import { Button, StyleSheet, Text, View } from "react-native";
+import { Button, Platform, StyleSheet, Text, View } from "react-native";
 import {
   clearAllExperimentData,
   Condition,
   CSV_HEADERS,
+  flipCondition,
   getLastLog,
   getLogs,
   getOrAssignCondition,
@@ -17,6 +18,7 @@ import {
 
 type Phase = "idle" | "running" | "done";
 
+
 export default function ExperimentScreen() {
   const [participantId, setParticipantId] = useState("");
   const [condition, setCondition] = useState<Condition>("baseline");
@@ -25,7 +27,6 @@ export default function ExperimentScreen() {
   const [logs, setLogs] = useState<TrialLog[]>([]);
   const [ready, setReady] = useState(false);
 
-  // On mount: load identity, condition, and check for a finished trial
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -50,19 +51,30 @@ export default function ExperimentScreen() {
     };
   }, []);
 
-  // Start the task: begins the timer and tells the user which tool to open
   const handleStart = async () => {
     await startTimer();
     setPhase("running");
   };
-
-  // Export logs as CSV
+  
   const handleExport = async () => {
     if (logs.length === 0) return;
     const csv = [CSV_HEADERS.join(","), ...logs.map(toCsvRow)].join("\n");
     const content = "\ufeff" + csv;
 
-    const fileUri = FileSystem.cacheDirectory + `experiment_${Date.now()}.csv`;
+    if (Platform.OS === "web") {
+      const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `experiment_${participantId}_${Date.now()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const fileUri = FileSystem.cacheDirectory + `experiment_log.csv`;
     await FileSystem.writeAsStringAsync(fileUri, content, {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -76,7 +88,14 @@ export default function ExperimentScreen() {
     }
   };
 
-  // Reset for a new participant
+  // NEW: start another task without wiping the accumulated logs
+  const handleNewTask = async () => {
+  const next = await flipCondition();
+  setCondition(next);
+  setLastLog(null);
+  setPhase("idle");
+  };
+
   const handleReset = async () => {
     await clearAllExperimentData();
     setPhase("idle");
@@ -88,7 +107,6 @@ export default function ExperimentScreen() {
 
   if (!ready) return <Text style={styles.loading}>Loading…</Text>;
 
-  // ----- IDLE: participant ID, condition, task brief -----
   if (phase === "idle") {
     return (
       <View style={styles.container}>
@@ -106,7 +124,6 @@ export default function ExperimentScreen() {
     );
   }
 
-  // ----- RUNNING: tell the user which screen to use -----
   if (phase === "running") {
     return (
       <View style={styles.container}>
@@ -126,7 +143,6 @@ export default function ExperimentScreen() {
     );
   }
 
-  // ----- DONE: show result and export -----
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Task Results</Text>
@@ -135,7 +151,7 @@ export default function ExperimentScreen() {
       {lastLog && (
         <>
           <Text style={styles.info}>
-            Time taken: {(lastLog.durationMs / 1000).toFixed(2)} s
+            Time taken: {(lastLog.duration_sec / 1000).toFixed(2)} s
           </Text>
           <Text style={styles.info}>
             Result: {lastLog.correct ? "Task completed" : "Incomplete"}
@@ -145,6 +161,7 @@ export default function ExperimentScreen() {
       <Text style={styles.info}>Total trials logged: {logs.length}</Text>
 
       <View style={styles.buttonGroup}>
+        <Button title="New Task" onPress={handleNewTask} />
         <Button title="Export CSV" onPress={handleExport} />
         <Button title="New Participant" onPress={handleReset} color="red" />
       </View>

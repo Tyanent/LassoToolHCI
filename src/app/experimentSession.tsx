@@ -8,7 +8,7 @@ export type TrialLog = {
   condition: Condition;
   trialNumber: number;
   timestamp: string;
-  durationMs: number;
+  duration_sec: number;
   correct: boolean;
   outcome: Outcome;          // NEW
   targetId: string;
@@ -68,7 +68,7 @@ export async function completeTask(
   const startStr = await AsyncStorage.getItem(START_KEY);
   if (!startStr) return null;
 
-  const durationMs = Date.now() - Number(startStr);
+  const duration_sec = (Date.now() - Number(startStr)) ;
 
   const [participantId, condition] = await Promise.all([
     getOrCreateParticipantId(),
@@ -80,7 +80,7 @@ export async function completeTask(
     condition,
     trialNumber: 1,
     timestamp: new Date().toISOString(),
-    durationMs,
+    duration_sec,
     // correct only when outcome is success and all 20 apps are accounted for
     correct: outcome === "success" && selectedIds.length >= 20,
     outcome,
@@ -99,6 +99,13 @@ export async function completeTask(
   await AsyncStorage.multiRemove([START_KEY, ACTIVE_KEY]);
 
   return log;
+}
+
+export async function flipCondition(): Promise<Condition> {
+  const current = await getOrAssignCondition();
+  const next: Condition = current === "baseline" ? "lassoTool" : "baseline";
+  await AsyncStorage.setItem(CONDITION_KEY, next);
+  return next;
 }
 
 export async function getLogs(): Promise<TrialLog[]> {
@@ -128,7 +135,7 @@ export function toCsvRow(row: TrialLog): string {
     row.condition,
     row.trialNumber,
     row.timestamp,
-    row.durationMs,
+    (row.duration_sec / 1000).toFixed(5),
     row.correct ? "1" : "0",
     row.outcome,
     row.targetId,
@@ -141,7 +148,7 @@ export const CSV_HEADERS = [
   "condition",
   "trial_number",
   "timestamp",
-  "duration_ms",
+  "duration_Sec",
   "correct",
   "outcome",
   "target_id",
