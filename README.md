@@ -23,15 +23,14 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```bash
    npx expo start
    ```
-3. Once the app is started, Select localhost link in the terminal output
-   
+3. Once the app is started, select the Web localhost link in the terminal output
 
 4. Click Meatball Menu (3 dots) > Select Device Emulation 
-![alt text](assets\LassoToolAssets\img1.png)
+<img width="732" height="935" alt="Screenshot 2026-10-27 225425" src="https://github.com/user-attachments/assets/1b7a3ea4-a1c6-466a-878a-f890b7f4515b" />
 
 5. Apply Iphone 15 Pro Preset
-![alt text](assets\LassoToolAssets\img2.png)
-![alt text](assets\LassoToolAssets\img3.png)
+<img width="247" height="400" alt="Screenshot 2026-10-27 225505" src="https://github.com/user-attachments/assets/f689e695-70f5-4478-8da4-042b74e7c41b" />
+<img width="1455" height="335" alt="Screenshot 2026-10-27 225513" src="https://github.com/user-attachments/assets/48f0188d-621c-4970-b1f9-cb05704a636a" />
 
 In the output, you'll find options to open the app in a
 
