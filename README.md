@@ -1,5 +1,13 @@
 # Welcome to Mobile Lasso Tool! 👋
 
+## Introduction
+The Mobile lasso tool is a project for a course on Human-Computer Interaction. This React Native project is a prototype of an alternative method for multiselection: a lasso-based selection tool. Inspired by the lasso tool from drawing applications and by how multiselection is handled on desktop devices, the lasso tool is intended to address the interaction challenges inherent in typical multiselection. 
+
+On most mobile devices, traditional multiselect implementations typically require repeated gestures, in which the user must tap each item they want to select individually. When selecting only a few items, it does get the job done; however, the need to interact with each app one by one makes the process of performing multiselection rather arduous when scaled up. 
+
+This prototype addresses this challenge for app organization on a phone's homescreen. Although not included at this stage of the project, we also intended to expand the use case of this tool to other scenarios. Such scenarios would include file management and image selection, however due to the constraints of this project, we limited the scenario to just the homme screen interaction. 
+
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started (Setting up Expo)
@@ -15,15 +23,14 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    ```bash
    npx expo start
    ```
-3. Once the app is started, Select localhost link in the terminal output
-   
+3. Once the app is started, select the Web localhost link in the terminal output
 
 4. Click Meatball Menu (3 dots) > Select Device Emulation 
-![alt text](assets\LassoToolAssets\img1.png)
+<img width="732" height="935" alt="Screenshot 2026-10-27 225425" src="https://github.com/user-attachments/assets/1b7a3ea4-a1c6-466a-878a-f890b7f4515b" />
 
 5. Apply Iphone 15 Pro Preset
-![alt text](assets\LassoToolAssets\img2.png)
-![alt text](assets\LassoToolAssets\img3.png)
+<img width="247" height="400" alt="Screenshot 2026-10-27 225505" src="https://github.com/user-attachments/assets/f689e695-70f5-4478-8da4-042b74e7c41b" />
+<img width="1455" height="335" alt="Screenshot 2026-10-27 225513" src="https://github.com/user-attachments/assets/48f0188d-621c-4970-b1f9-cb05704a636a" />
 
 In the output, you'll find options to open the app in a
 
@@ -41,8 +48,6 @@ You can start developing by editing the files inside the **src/app** directory. 
 2. Follow the instructions and start the task
    
 3. After completing the task, export csv to keep a record of the results.
-
-
 
 
 ## Learn more
