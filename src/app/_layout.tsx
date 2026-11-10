@@ -1,14 +1,16 @@
 // app/_layout.tsx
 import { Stack, useRouter, useSegments } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function HeaderBar() {
   const router = useRouter();
   const segments = useSegments();
   const current = segments[segments.length - 1];
+  const insets = useSafeAreaInsets();
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + 8, height: 56 + insets.top }]}>
       <View style={styles.left}>
         <Pressable
           onPress={() => router.back()}
@@ -78,7 +80,6 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   header: {
-    height: 56,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

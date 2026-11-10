@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
   Animated,
@@ -12,7 +13,7 @@ import {
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
-import { completeTask } from "./experimentSession";
+import { completeTask, isTaskSatisfied } from "./experimentSession";
 
 // ---------- Layout ----------
 const height = 900;
@@ -68,42 +69,45 @@ const APPS: AppIcon[] = labels.map((label, i) => {
   };
 });
 
-// ---------- Helpers ----------
-function rectContains(
-  rect: { x: number; y: number; size: number },
-  px: number,
-  py: number
-) {
-  return (
-    px >= rect.x &&
-    px <= rect.x + rect.size &&
-    py >= rect.y &&
-    py <= rect.y + rect.size
-  );
-}
+// Every app is on "page 1" in this single-page build; kept so the
+// task validators in experimentSession receive a valid pageOf callback.
+const PAGE_OF = (_id: string): number => 1;
 
-// Find the folder or ungrouped app under a point, excluding the dragged app
+// ---------- Helpers ----------
 function findDropTarget(
-  px: number,
-  py: number,
+  draggedCenterX: number,
+  draggedCenterY: number,
   apps: AppIcon[],
   folders: Folder[],
-  draggedId: string
+  draggedId: string,
+  maxDistance: number = 60
 ): { kind: "app"; id: string } | { kind: "folder"; id: string } | null {
-  // Folders take priority (they sit on top)
+  let best: { kind: "app" | "folder"; id: string } | null = null;
+  let bestDist = maxDistance;
+
+  // Folders take priority when close enough
   for (const f of folders) {
-    if (rectContains({ x: f.x, y: f.y, size: f.size }, px, py)) {
-      return { kind: "folder", id: f.id };
+    const cx = f.x + f.size / 2;
+    const cy = f.y + f.size / 2;
+    const d = Math.hypot(cx - draggedCenterX, cy - draggedCenterY);
+    if (d < bestDist) {
+      bestDist = d;
+      best = { kind: "folder", id: f.id };
     }
   }
+  // Only check apps if no folder is closer
   for (const a of apps) {
     if (a.id === draggedId) continue;
-    if (a.groupId) continue; // hidden apps can't be targets
-    if (rectContains({ x: a.x, y: a.y, size: a.size }, px, py)) {
-      return { kind: "app", id: a.id };
+    if (a.groupId) continue;
+    const cx = a.x + a.size / 2;
+    const cy = a.y + a.size / 2;
+    const d = Math.hypot(cx - draggedCenterX, cy - draggedCenterY);
+    if (d < bestDist) {
+      bestDist = d;
+      best = { kind: "app", id: a.id };
     }
   }
-  return null;
+  return best;
 }
 
 // ---------- Draggable app icon ----------
@@ -116,7 +120,7 @@ function DraggableAppIcon({
 }: {
   app: AppIcon;
   isDragging: boolean;
-  onDragStart: (id: string) => void;
+  onDragStart: (id: string, absX: number, absY: number) => void;
   onDragMove: (id: string, absX: number, absY: number) => void;
   onDragEnd: (id: string, absX: number, absY: number) => void;
 }) {
@@ -128,7 +132,7 @@ function DraggableAppIcon({
     .onStart((e) => {
       startXRef.current = e.absoluteX;
       startYRef.current = e.absoluteY;
-      runOnJS(onDragStart)(app.id);
+      runOnJS(onDragStart)(app.id, e.absoluteX, e.absoluteY);
     })
     .onUpdate((e) => {
       runOnJS(onDragMove)(app.id, e.absoluteX, e.absoluteY);
@@ -213,115 +217,122 @@ function FolderTile({
 
 // ---------- Main screen ----------
 export default function Index() {
+  const router = useRouter();
   const [apps, setApps] = useState<AppIcon[]>(APPS);
   const [folders, setFolders] = useState<Folder[]>([]);
   const groupIdCounter = useRef(0);
 
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [hoverTarget, setHoverTarget] = useState<
     { kind: "app" | "folder"; id: string } | null
   >(null);
+  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const dragStartRef = useRef<{ absX: number; absY: number } | null>(null);
 
   // ---------- Drag handlers ----------
-  const handleDragStart = (id: string) => {
+  const handleDragStart = (id: string, absX: number, absY: number) => {
+    dragStartRef.current = { absX, absY };
     setDraggingId(id);
     setHoverTarget(null);
+    setDragDelta({ x: 0, y: 0 });
   };
 
   const handleDragMove = (id: string, absX: number, absY: number) => {
-    setDragPos({ x: absX, y: absY });
+    const start = dragStartRef.current;
+    if (!start) return;
 
-    // Use the finger position (not the icon top-left) as the hit point
-    const target = findDropTarget(
-      absX,
-      absY,
-      apps,
-      folders,
-      id
-    );
+    const deltaX = absX - start.absX;
+    const deltaY = absY - start.absY;
+    setDragDelta({ x: deltaX, y: deltaY });
+
+    const dragged = apps.find((a) => a.id === id);
+    if (!dragged) return;
+
+    // Center of the dragged icon in container space
+    const centerX = dragged.x + dragged.size / 2 + deltaX;
+    const centerY = dragged.y + dragged.size / 2 + deltaY;
+
+    const target = findDropTarget(centerX, centerY, apps, folders, id);
     setHoverTarget(target);
   };
 
   const handleDragEnd = async (id: string, absX: number, absY: number) => {
-  if (absX >= 0 && absY >= 0) {
-    const target = findDropTarget(absX, absY, apps, folders, id);
+    const start = dragStartRef.current;
+    const dragged = apps.find((a) => a.id === id);
+    dragStartRef.current = null;
 
-    let nextFolders = folders;
+    if (start && dragged && absX >= 0 && absY >= 0) {
+      const centerX = dragged.x + dragged.size / 2 + (absX - start.absX);
+      const centerY = dragged.y + dragged.size / 2 + (absY - start.absY);
 
-    if (target?.kind === "app") {
-      const targetApp = apps.find((a) => a.id === target.id);
-      const dragged = apps.find((a) => a.id === id);
-      if (targetApp && dragged) {
-        const groupId = `group-${groupIdCounter.current++}`;
+      const target = findDropTarget(centerX, centerY, apps, folders, id);
+
+      let nextFolders = folders;
+
+      if (target?.kind === "app") {
+        const targetApp = apps.find((a) => a.id === target.id);
+        if (targetApp) {
+          const groupId = `group-${groupIdCounter.current++}`;
+          setApps((prev) =>
+            prev.map((a) =>
+              a.id === dragged.id || a.id === targetApp.id
+                ? { ...a, groupId }
+                : a
+            )
+          );
+
+          nextFolders = [
+            ...folders,
+            {
+              id: groupId,
+              label: `Folder ${groupIdCounter.current}`,
+              x: targetApp.x,
+              y: targetApp.y,
+              size: iconSize,
+              containerHeight,
+              appIds: [dragged.id, targetApp.id],
+            },
+          ];
+          setFolders(nextFolders);
+        }
+      } else if (target?.kind === "folder") {
         setApps((prev) =>
           prev.map((a) =>
-            a.id === dragged.id || a.id === targetApp.id
-              ? { ...a, groupId }
-              : a
+            a.id === id ? { ...a, groupId: target.id } : a
           )
         );
 
-        // ← build nextFolders locally
-        nextFolders = [
-          ...folders,
-          {
-            id: groupId,
-            label: `Folder ${groupIdCounter.current}`,
-            x: targetApp.x,
-            y: targetApp.y,
-            size: iconSize,
-            containerHeight,
-            appIds: [dragged.id, targetApp.id],
-          },
-        ];
-        setFolders(nextFolders);   // ← pass the same array to state
-      }
-    } else if (target?.kind === "folder") {
-      setApps((prev) =>
-        prev.map((a) =>
-          a.id === id ? { ...a, groupId: target.id } : a
-        )
-      );
-
-      // ← build nextFolders locally
-      nextFolders = folders.map((f) =>
-        f.id === target.id
-          ? { ...f, appIds: [...f.appIds, id] }
-          : f
-      );
-      setFolders(nextFolders);   // ← pass the same array to state
-    }
-
-    // ---- Completion check ----
-    // Now nextFolders reflects the post-drop state.
-    if (nextFolders.length >= 5) {
-      const taskComplete = nextFolders.every(
-        (f) => f.appIds.length >= 4
-      );
-      const totalGrouped = nextFolders.reduce(
-        (s, f) => s + f.appIds.length,
-        0
-      );
-      const allAppsGrouped = totalGrouped === 20;
-      const wrongStructure = allAppsGrouped && !taskComplete;
-
-      if (taskComplete || wrongStructure) {
-        const allGroupedIds = nextFolders.flatMap((f) => f.appIds);
-        const log = await completeTask(
-          allGroupedIds,
-          "20",
-          taskComplete ? "success" : "failure"
+        nextFolders = folders.map((f) =>
+          f.id === target.id
+            ? { ...f, appIds: [...f.appIds, id] }
+            : f
         );
-        if (log) console.log("Baseline task logged:", log);
+        setFolders(nextFolders);
+      }
+
+      // ---- Completion check (task-aware) ----
+      const foldersSnapshot = nextFolders.map((f) => ({ appIds: f.appIds }));
+
+      if (await isTaskSatisfied(foldersSnapshot, PAGE_OF)) {
+        const log = await completeTask({
+          folders: foldersSnapshot,
+          targetId: String(foldersSnapshot.flatMap((f) => f.appIds).length),
+          pageOf: PAGE_OF,
+        });
+
+        if (log) {
+          console.log("Baseline task logged:", log);
+          router.navigate("/experiment");
+        }
       }
     }
-  }
 
-  setDraggingId(null);
-  setDragPos(null);
-  setHoverTarget(null);
-};
+    setDraggingId(null);
+    setDragDelta(null);
+    setHoverTarget(null);
+  };
 
   // ---------- Derived ----------
   const visibleApps = apps.filter((a) => !a.groupId);
@@ -357,7 +368,6 @@ export default function Index() {
             folder={folder}
             apps={apps}
             onOpen={() => {
-              // Placeholder: add a modal later
               console.log("Open folder", folder.id);
             }}
           />
@@ -373,23 +383,30 @@ export default function Index() {
         )}
 
         {/* Floating dragged icon following the finger */}
-        {draggedApp && dragPos && (
+        {draggedApp && dragDelta && (
           <View
             pointerEvents="none"
             style={[
               styles.floatingIcon,
               {
-                left: dragPos.x - draggedApp.size / 2,
-                top: dragPos.y - draggedApp.size / 2,
+                left: draggedApp.x + dragDelta.x,
+                top: draggedApp.y + dragDelta.y,
                 width: draggedApp.size,
-                height: draggedApp.size,
+                height: draggedApp.containerHeight,
               },
             ]}
           >
             <Image
               source={require("../../assets/LassoToolAssets/app.png")}
-              style={{ width: "100%", height: "100%", borderRadius: 14 }}
+              style={{
+                width: draggedApp.size,
+                height: draggedApp.size,
+                borderRadius: 14,
+              }}
             />
+            <Text numberOfLines={1} style={styles.appLabel}>
+              {draggedApp.label}
+            </Text>
           </View>
         )}
       </View>
@@ -477,7 +494,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     width: 48,
     height: 48,
-    
     alignItems: "center",
     gap: 3,
   },

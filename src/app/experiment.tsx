@@ -1,61 +1,99 @@
 import * as FileSystem from "expo-file-system/legacy";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Platform, StyleSheet, Text, View } from "react-native";
 import {
   clearAllExperimentData,
-  Condition,
   CSV_HEADERS,
-  flipCondition,
-  getLastLog,
+  getCurrentTrial,
   getLogs,
-  getOrAssignCondition,
   getOrCreateParticipantId,
   startTimer,
+  TASKS,
   toCsvRow,
   TrialLog,
+  TrialPlanEntry,
 } from "./experimentSession";
 
-type Phase = "idle" | "running" | "done";
+type Phase = "idle" | "done" | "complete";
 
+type CurrentTrial = {
+  index: number;
+  total: number;
+  trial: TrialPlanEntry;
+};
 
 export default function ExperimentScreen() {
   const [participantId, setParticipantId] = useState("");
-  const [condition, setCondition] = useState<Condition>("baseline");
+  const [currentTrial, setCurrentTrial] = useState<CurrentTrial | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [lastLog, setLastLog] = useState<TrialLog | null>(null);
   const [logs, setLogs] = useState<TrialLog[]>([]);
   const [ready, setReady] = useState(false);
+  const router = useRouter();
+  const shownLogCountRef = useRef(0);
 
+  // Initial mount
   useEffect(() => {
-    let cancelled = false;
     (async () => {
-      const [id, cond, allLogs, newest] = await Promise.all([
+      const [id, trial, allLogs] = await Promise.all([
         getOrCreateParticipantId(),
-        getOrAssignCondition(),
+        getCurrentTrial(),
         getLogs(),
-        getLastLog(),
       ]);
-      if (cancelled) return;
       setParticipantId(id);
-      setCondition(cond);
+      setCurrentTrial(trial);
       setLogs(allLogs);
-      if (newest) {
-        setLastLog(newest);
-        setPhase("done");
-      }
+      shownLogCountRef.current = allLogs.length;
+      setPhase(trial ? "idle" : "complete");
       setReady(true);
     })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
+  // On focus (returning from baseline/lasso)
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        const [trial, allLogs] = await Promise.all([
+          getCurrentTrial(),
+          getLogs(),
+        ]);
+        if (cancelled) return;
+        setCurrentTrial(trial);
+        setLogs(allLogs);
+
+        if (allLogs.length > shownLogCountRef.current) {
+          // A new trial was completed while we were away
+          setLastLog(allLogs[allLogs.length - 1]);
+          shownLogCountRef.current = allLogs.length;
+          setPhase(trial ? "done" : "complete");
+        } else {
+          setPhase(trial ? "idle" : "complete");
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
   const handleStart = async () => {
+    if (!currentTrial) return;
     await startTimer();
-    setPhase("running");
+    router.navigate(
+      currentTrial.trial.condition === "baseline" ? "/baseline" : "/"
+    );
   };
-  
+
+  const handleNext = async () => {
+    setLastLog(null);
+    const trial = await getCurrentTrial();
+    setCurrentTrial(trial);
+    setPhase(trial ? "idle" : "complete");
+  };
+
   const handleExport = async () => {
     if (logs.length === 0) return;
     const csv = [CSV_HEADERS.join(","), ...logs.map(toCsvRow)].join("\n");
@@ -88,82 +126,127 @@ export default function ExperimentScreen() {
     }
   };
 
-  // NEW: start another task without wiping the accumulated logs
-  const handleNewTask = async () => {
-  const next = await flipCondition();
-  setCondition(next);
-  setLastLog(null);
-  setPhase("idle");
-  };
-
   const handleReset = async () => {
     await clearAllExperimentData();
-    setPhase("idle");
+    shownLogCountRef.current = 0;
+    const [id, trial] = await Promise.all([
+      getOrCreateParticipantId(),
+      getCurrentTrial(),
+    ]);
+    setParticipantId(id);
+    setCurrentTrial(trial);
     setLastLog(null);
     setLogs([]);
-    setParticipantId(await getOrCreateParticipantId());
-    setCondition(await getOrAssignCondition());
+    setPhase(trial ? "idle" : "complete");
   };
 
   if (!ready) return <Text style={styles.loading}>Loading…</Text>;
 
+  if (phase === "complete") {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Study Complete</Text>
+        <Text style={styles.info}>Participant: {participantId}</Text>
+        <Text style={styles.info}>Trials completed: {logs.length}</Text>
+
+        <View style={styles.buttonGroup}>
+          <Button title="Export CSV" onPress={handleExport} />
+          <Button
+            title="New Participant"
+            onPress={handleReset}
+            color="red"
+          />
+        </View>
+      </View>
+    );
+  }
+
+  if (!currentTrial) return <Text style={styles.loading}>Loading…</Text>;
+
+  const spec = TASKS[currentTrial.trial.taskId];
+  const conditionLabel =
+    currentTrial.trial.condition === "baseline" ? "Baseline" : "Lasso";
+
   if (phase === "idle") {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>User Study</Text>
-        <Text style={styles.info}>Participant ID: {participantId}</Text>
-        <Text style={styles.info}>Assigned condition: {condition}</Text>
-
-        <Text style={styles.brief}>
-          Your task: Create 5 folders, each containing 4 apps. The timer starts
-          when you press Start and stops when you create your 5th folder.
+        <Text style={styles.title}>
+          Trial {currentTrial.index + 1} of {currentTrial.total}
         </Text>
+        <Text style={styles.info}>Participant: {participantId}</Text>
+        <Text style={styles.info}>Condition: {conditionLabel}</Text>
+        <Text style={styles.info}>Task: {spec.label}</Text>
+
+        <Text style={styles.brief}>{spec.brief}</Text>
 
         <Button title="Start Task" onPress={handleStart} />
+        <Button
+            title="New Participant"
+            onPress={handleReset}
+            color="red"
+          />
       </View>
     );
   }
 
-  if (phase === "running") {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Task in progress…</Text>
-        <Text style={styles.info}>
-          Use the{" "}
-          <Text style={styles.emphasis}>
-            {condition === "baseline" ? "Baseline" : "Lasso"}
-          </Text>{" "}
-          tab to create 5 folders with 4 apps each.
-        </Text>
-        <Text style={styles.info}>
-          When you create your 5th folder, the timer stops automatically and
-          your result is saved. Come back to this tab to see it.
-        </Text>
-      </View>
-    );
-  }
-
+  // phase === "done"
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Task Results</Text>
+      <Text style={styles.title}>Trial Complete</Text>
       <Text style={styles.info}>Participant: {participantId}</Text>
-      <Text style={styles.info}>Condition: {condition}</Text>
+
       {lastLog && (
         <>
+          <Text style={styles.info}>
+            Condition:{" "}
+            {lastLog.condition === "baseline" ? "Baseline" : "Lasso"}
+          </Text>
+          <Text style={styles.info}>
+            Task: {TASKS[lastLog.taskId].label}
+          </Text>
           <Text style={styles.info}>
             Time taken: {(lastLog.duration_sec / 1000).toFixed(2)} s
           </Text>
           <Text style={styles.info}>
-            Result: {lastLog.correct ? "Task completed" : "Incomplete"}
+            Result: {lastLog.correct ? "Completed" : "Incomplete"}
           </Text>
         </>
       )}
-      <Text style={styles.info}>Total trials logged: {logs.length}</Text>
+
+      <Text style={styles.info}>
+        {currentTrial
+          ? `Next: trial ${currentTrial.index + 1} of ${currentTrial.total}`
+          : "All trials complete"}
+      </Text>
 
       <View style={styles.buttonGroup}>
-        <Button title="New Task" onPress={handleNewTask} />
+        <Button
+          title={currentTrial ? "Next Task" : "Finish"}
+          onPress={handleNext}
+        />
         <Button title="Export CSV" onPress={handleExport} />
-        <Button title="New Participant" onPress={handleReset} color="red" />
+        <Button
+          title="New Participant"
+          onPress={handleReset}
+          color="red"
+        />
+        <Button
+          title="Reset Plan (dev)"
+          onPress={async () => {
+            await clearAllExperimentData();
+            shownLogCountRef.current = 0;
+            const [id, trial] = await Promise.all([
+              getOrCreateParticipantId(),
+              getCurrentTrial(),
+            ]);
+            setParticipantId(id);
+            setCurrentTrial(trial);
+            setLastLog(null);
+            setLogs([]);
+            setPhase(trial ? "idle" : "complete");
+          }}
+          color="orange"
+        />
       </View>
     </View>
   );
@@ -174,7 +257,6 @@ const styles = StyleSheet.create({
   loading: { flex: 1, textAlign: "center", marginTop: 100 },
   title: { fontSize: 22, fontWeight: "700", marginBottom: 8 },
   info: { fontSize: 16 },
-  emphasis: { fontWeight: "700", color: "#007AFF" },
   brief: {
     fontSize: 15,
     marginVertical: 16,
