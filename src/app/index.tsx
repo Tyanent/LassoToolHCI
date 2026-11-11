@@ -46,11 +46,11 @@ type Folder = {
 };
 
 // Icon positions
-const startX = 15;
-const startY = 40;
+const startX = 25;
+const startY = 15;
 const iconSize = 64;
-const Xspacing = 100;
-const Yspacing = 100;
+const Xspacing = 95;
+const Yspacing = 95;
 const numColumns = 4;
 const LabelHeight = 15;
 
@@ -70,8 +70,10 @@ const labels = [
   "Settings", "Phone", "Wallet", "Messages",
   "Calendar", "Reminders", "Stocks", "Books",
   "Podcasts", "Health", "Files", "Bank",
+  "Search", "Socials", "Contacts", "Calculator",
 ];
 
+// ── Grid layout (unchanged) ──────────────────────────────────
 const APPS: AppIcon[] = labels.map((label, i) => {
   const col = i % numColumns;
   const row = Math.floor(i / numColumns);
@@ -86,6 +88,92 @@ const APPS: AppIcon[] = labels.map((label, i) => {
   };
 });
 
+// ── NEW: scattered layout for page 1 ─────────────────────────
+const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
+  [0, 0], [0, 1], [0, 2], [0, 3],
+  [1, 2], [1, 3],
+  [2, 2], [2, 3],
+  [3, 0], [3, 1],[3, 2], [3, 3],
+  [4, 0], [4, 1], [4, 2], [4, 3],
+  [5, 0], [5, 1], [5, 2], [5, 3],
+];
+
+// Same as #1 for now — replace when you want a different scatter.
+const SCATTERED_CELLS_2: Array<[row: number, col: number]> = [
+  [0, 0], [0, 1], [0, 2], [0, 3],
+  [1, 2], [1, 3],
+  [2, 2], [2, 3],
+  [3, 0],[3, 1], [3, 2], [3, 3],
+];
+
+// Same as #1 for now — replace when you want a different scatter.
+const SCATTERED_CELLS_3: Array<[row: number, col: number]> = [
+  [0, 0], [0, 1],
+  [1, 0], [1, 1], 
+  [2, 2], [2, 3],
+  [3, 2], [3, 3],
+];
+
+export type LayoutMode = "grid" | "scattered-1" | "scattered-2" | "scattered-3";
+
+const LAYOUT_CYCLE: LayoutMode[] = [
+  "grid",
+  "scattered-1",
+  "scattered-2",
+  "scattered-3",
+];
+
+const SCATTERED_CELLS_BY_MODE: Record<
+  Exclude<LayoutMode, "grid">,
+  Array<[row: number, col: number]>
+> = {
+  "scattered-1": SCATTERED_CELLS_1,
+  "scattered-2": SCATTERED_CELLS_2,
+  "scattered-3": SCATTERED_CELLS_3,
+};
+
+function buildScatteredApps(cells: Array<[number, number]>): AppIcon[] {
+  return labels.slice(0, cells.length).map((label, i) => {
+    const [row, col] = cells[i];
+    return {
+      id: String(i + 1),
+      label,
+      x: startX + col * Xspacing,
+      y: startY + row * Yspacing,
+      size: iconSize,
+      containerHeight: iconSize + LabelHeight, // baseline uses `containerHeight` (no +LabelHeight)
+    };
+  });
+}
+
+const APPS_SCATTERED_BY_MODE: Record<
+  Exclude<LayoutMode, "grid">,
+  AppIcon[]
+> = {
+  "scattered-1": buildScatteredApps(SCATTERED_CELLS_1),
+  "scattered-2": buildScatteredApps(SCATTERED_CELLS_2),
+  "scattered-3": buildScatteredApps(SCATTERED_CELLS_3),
+};
+
+/** How many page-1 apps to show for the current mode (undefined = all). */
+function scatteredAppCountFor(mode: LayoutMode): number | undefined {
+  return mode === "grid" ? undefined : SCATTERED_CELLS_BY_MODE[mode].length;
+}
+
+/** The positioned apps for the given mode. */
+function appsForMode(mode: LayoutMode): AppIcon[] {
+  return mode === "grid" ? APPS : APPS_SCATTERED_BY_MODE[mode];
+}
+
+/** Human-readable label for the toggle button. */
+const LAYOUT_LABEL: Record<LayoutMode, string> = {
+  grid: "Grid",
+  "scattered-1": "Scattered 1",
+  "scattered-2": "Scattered 2",
+  "scattered-3": "Scattered 3",
+};
+// ─────────────────────────────────────────────────────────────
+
 // ── Decoy pages ──────────────────────────────────────────────
 const PAGE_2_LABELS = [
   "Gym",
@@ -96,17 +184,19 @@ const PAGE_2_LABELS = [
   "Finance",
   "Scanner",
   "Translate",
+  "Paint",
+  "Journal"
 ];
 
 const PAGE_3_LABELS = [
-  "Podcasts 2",
-  "Health 2",
-  "Files 2",
-  "Bank 2",
-  "Notes 2",
-  "Books 2",
-  "Stocks 2",
-  "Reminders 2",
+  "Transport",
+  "Shop",
+  "Delivery",
+  "Food",
+  "Journal",
+  "Movies",
+  "Games",
+  "Compass",
 ];
 
 function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
@@ -201,28 +291,26 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           width: app.size,
           height: app.containerHeight,
           transform: [{ rotate }],
+          shadowColor: "black",
+          shadowOffset: selected
+            ? { width: 0, height: 2}
+            : { width: 0, height: 0 },
+          shadowOpacity: selected ? 0.7 : 0.3,
+          shadowRadius: selected ? 3 : 1,
         },
       ]}
     >
-      <Image
-        source={require("../../assets/LassoToolAssets/app.png")}
-        style={{
+      <Image source={require("../../assets/LassoToolAssets/app.png")} style={{
           width: app.size,
           height: app.size,
           borderRadius: 14,
-          shadowColor: "#000",
-          shadowOffset: selected
-            ? { width: 0, height: 2 }
-            : { width: 0, height: 0 },
-          shadowOpacity: selected ? 0.8 : 0.3,
-          shadowRadius: selected ? 4 : 2,
-          elevation: 5,
+          // borderColor: selected ? "blue" : "transparent",
+          // borderWidth: selected ? 2 : 0,
+          
         }}
       />
 
-      <Text
-        numberOfLines={1}
-        style={{
+      <Text numberOfLines={1} style={{
           width: app.size,
           height: LabelHeight,
           lineHeight: LabelHeight,
@@ -298,6 +386,53 @@ export default function Index() {
   ]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const groupIdCounter = useRef(0);
+
+  // ── NEW: page-1 layout toggle ─────────────────────────────
+  // ── Layout mode: grid → scattered-1 → scattered-2 → scattered-3 → grid ──
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
+
+  const cycleLayout = () => {
+    const next =
+      LAYOUT_CYCLE[(LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length];
+    setLayoutMode(next);
+
+    // Reposition page-1 apps in place so groupIds and folders survive.
+    const positions = appsForMode(next);
+    const posById = new Map(positions.map((a) => [a.id, a]));
+
+    setApps((prev) =>
+      prev.map((app) => {
+        const pos = posById.get(app.id);
+        return pos ? { ...app, x: pos.x, y: pos.y } : app;
+      })
+    );
+
+    // When entering a scattered mode, drop folders/groups that reference
+    // page-1 apps which will now be hidden.
+    if (next !== "grid") {
+      const limit = SCATTERED_CELLS_BY_MODE[next].length;
+      const hidden = (id: string) => {
+        const n = Number(id);
+        return !Number.isNaN(n) && n > limit;
+      };
+
+      // index.tsx only — clears selection of hidden apps
+      setSelectedIds((prev) => prev.filter((id) => !hidden(id)));
+
+      // both files — drops folders that would become orphaned
+      setFolders((prev) =>
+        prev.filter((f) => f.appIds.every((id) => !hidden(id)))
+      );
+      setApps((prev) =>
+        prev.map((app) => (hidden(app.id) ? { ...app, groupId: undefined } : app))
+      );
+    }
+  };
+  // ────────────────────────────────────────────────────────────
+
+  // ── NEW: pager visibility toggle (hidden by default) ──────
+  const [showPager, setShowPager] = useState(false);
+  // ────────────────────────────────────────────────────────────
 
   // ── Pager state (tap-based, no gesture) ───────────────────
   const [page, setPage] = useState<0 | 1 | 2>(0);
@@ -466,9 +601,20 @@ export default function Index() {
   };
 
   // ── Visible apps for the current page ──────────────────────
-  const visibleApps = apps.filter(
-    (a) => !a.groupId && PAGE_OF(a.id) === page + 1
-  );
+  const visibleApps = apps.filter((a) => {
+    if (a.groupId) return false;
+    const p = PAGE_OF(a.id);
+    if (p !== page + 1) return false;
+
+    if (page === 0) {
+      const limit = scatteredAppCountFor(layoutMode);
+      if (limit !== undefined) {
+        const n = Number(a.id) - 1;
+        if (Number.isNaN(n) || n >= limit) return false;
+      }
+    }
+    return true;
+  });
   // ────────────────────────────────────────────────────────────
 
   return (
@@ -527,36 +673,41 @@ export default function Index() {
           </View>
         </GestureDetector>
 
-        {/* Page navigation + dots */}
-        <View style={styles.pagerBar} pointerEvents="box-none">
-          <TouchableOpacity
-            style={[styles.pageButton, page === 0 && styles.pageButtonDisabled]}
-            disabled={page === 0}
-            onPress={() => goToPage(page - 1)}
-          >
-            <Text style={styles.pageButtonText}>‹ Prev</Text>
-          </TouchableOpacity>
+        {/* Page navigation + dots — only visible when showPager is true */}
+        {showPager && (
+          <View style={styles.pagerBar} pointerEvents="box-none">
+            <TouchableOpacity
+              style={[
+                styles.pageButton,
+                page === 0 && styles.pageButtonDisabled,
+              ]}
+              disabled={page === 0}
+              onPress={() => goToPage(page - 1)}
+            >
+              <Text style={styles.pageButtonText}>‹</Text>
+            </TouchableOpacity>
 
-          <View style={styles.dots}>
-            {Array.from({ length: PAGE_COUNT }).map((_, i) => (
-              <View
-                key={i}
-                style={[styles.dot, page === i && styles.dotActive]}
-              />
-            ))}
+            <View style={styles.dots}>
+              {Array.from({ length: PAGE_COUNT }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, page === i && styles.dotActive]}
+                />
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.pageButton,
+                page === PAGE_COUNT - 1 && styles.pageButtonDisabled,
+              ]}
+              disabled={page === PAGE_COUNT - 1}
+              onPress={() => goToPage(page + 1)}
+            >
+              <Text style={styles.pageButtonText}>›</Text>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={[
-              styles.pageButton,
-              page === PAGE_COUNT - 1 && styles.pageButtonDisabled,
-            ]}
-            disabled={page === PAGE_COUNT - 1}
-            onPress={() => goToPage(page + 1)}
-          >
-            <Text style={styles.pageButtonText}>Next ›</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
         <View style={styles.buttonRow}>
           <TouchableOpacity
@@ -572,6 +723,22 @@ export default function Index() {
 
           <TouchableOpacity style={styles.button} onPress={ungroupSelectedApps}>
             <Text style={styles.buttonText}>Reset</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* REMOVE LATER: dev toggles */} 
+        <View style={styles.toggleRow}>
+          <TouchableOpacity style={styles.toggleButton} onPress={cycleLayout}>
+          <Text style={styles.toggleText}>Layout: {LAYOUT_LABEL[layoutMode]}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => setShowPager((v) => !v)}
+          >
+            <Text style={styles.toggleText}>
+              Pager: {showPager ? "On" : "Off"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -604,7 +771,7 @@ const styles = StyleSheet.create({
   },
   pagerBar: {
     position: "absolute",
-    bottom: 150,
+    bottom: 120,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -647,10 +814,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
     paddingHorizontal: 20,
-    marginTop: 10,
+    marginTop: 0,
   },
   button: {
-    marginTop: 10,
+    marginTop: 5,
     backgroundColor: "black",
     opacity: 0.5,
     paddingVertical: 10,
@@ -666,6 +833,27 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
+
+  // NEW styles
+  toggleRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12,
+    marginTop: 12,
+    paddingHorizontal: 20,
+  },
+  toggleButton: {
+    backgroundColor: "#333",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 100,
+  },
+  toggleText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
   app: {
     position: "absolute",
     alignItems: "center",

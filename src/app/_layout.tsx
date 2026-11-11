@@ -10,7 +10,7 @@ function HeaderBar() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.header, { paddingTop: insets.top + 8, height: 56 + insets.top }]}>
+    <View style={[styles.header, { paddingTop: insets.top, height: 50 + insets.top }]}>
       <View style={styles.left}>
         <Pressable
           onPress={() => router.back()}
