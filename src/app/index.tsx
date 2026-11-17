@@ -291,12 +291,6 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           width: app.size,
           height: app.containerHeight,
           transform: [{ rotate }],
-          shadowColor: "black",
-          shadowOffset: selected
-            ? { width: 0, height: 2}
-            : { width: 0, height: 0 },
-          shadowOpacity: selected ? 0.7 : 0.3,
-          shadowRadius: selected ? 3 : 1,
         },
       ]}
     >

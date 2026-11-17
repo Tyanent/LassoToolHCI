@@ -1,8 +1,8 @@
+// name=baseline.tsx
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import {
-  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,7 +13,11 @@ import {
   GestureDetector,
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
-import { runOnJS } from "react-native-reanimated";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { completeTask, isTaskSatisfied } from "./experimentSession";
 
 // ---------- Layout ----------
@@ -37,6 +41,7 @@ type AppIcon = {
   size: number;
   containerHeight: number;
   groupId?: string;
+  page: number; // 1-based page this app lives on
 };
 
 type Folder = {
@@ -47,7 +52,7 @@ type Folder = {
   size: number;
   containerHeight: number;
   appIds: string[];
-  page: number; // NEW — 1-based page this folder lives on
+  page: number; // 1-based page this folder lives on
 };
 
 const labels = [
@@ -73,6 +78,7 @@ const APPS: AppIcon[] = labels.map((label, i) => {
     y: startY + row * Yspacing,
     size: iconSize,
     containerHeight,
+    page: 1,
   };
 });
 
@@ -125,6 +131,7 @@ function buildScatteredApps(cells: Array<[number, number]>): AppIcon[] {
       y: startY + row * Yspacing,
       size: iconSize,
       containerHeight,
+      page: 1,
     };
   });
 }
@@ -176,18 +183,13 @@ function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
       y: startY + row * Yspacing,
       size: iconSize,
       containerHeight,
+      page: pageIndex,
     };
   });
 }
 
 const APPS_PAGE_2 = buildDecoyPage(PAGE_2_LABELS, 2);
 const APPS_PAGE_3 = buildDecoyPage(PAGE_3_LABELS, 3);
-
-const PAGE_OF = (id: string): number => {
-  if (id.startsWith("p2-")) return 2;
-  if (id.startsWith("p3-")) return 3;
-  return 1;
-};
 
 // ---------- Helpers ----------
 function findDropTarget(
@@ -202,7 +204,6 @@ function findDropTarget(
   let best: { kind: "app" | "folder"; id: string } | null = null;
   let bestDist = maxDistance;
 
-  // Only folders that live on the current page are eligible.
   for (const f of folders) {
     if (f.page !== currentPage) continue;
     const cx = f.x + f.size / 2;
@@ -214,11 +215,10 @@ function findDropTarget(
     }
   }
 
-  // Only apps on the current page are eligible.
   for (const a of apps) {
     if (a.id === draggedId) continue;
     if (a.groupId) continue;
-    if (PAGE_OF(a.id) !== currentPage) continue;
+    if (a.page !== currentPage) continue;
     const cx = a.x + a.size / 2;
     const cy = a.y + a.size / 2;
     const d = Math.hypot(cx - draggedCenterX, cy - draggedCenterY);
@@ -244,14 +244,9 @@ function DraggableAppIcon({
   onDragMove: (id: string, absX: number, absY: number) => void;
   onDragEnd: (id: string, absX: number, absY: number) => void;
 }) {
-  const startXRef = useRef(0);
-  const startYRef = useRef(0);
-
   const pan = Gesture.Pan()
     .activateAfterLongPress(300)
     .onStart((e) => {
-      startXRef.current = e.absoluteX;
-      startYRef.current = e.absoluteY;
       runOnJS(onDragStart)(app.id, e.absoluteX, e.absoluteY);
     })
     .onUpdate((e) => {
@@ -369,6 +364,7 @@ export default function Index() {
 
     setApps((prev) =>
       prev.map((app) => {
+        if (app.page !== 1) return app;
         const pos = posById.get(app.id);
         return pos ? { ...app, x: pos.x, y: pos.y } : app;
       })
@@ -376,40 +372,96 @@ export default function Index() {
 
     if (next !== "grid") {
       const limit = SCATTERED_CELLS_BY_MODE[next].length;
-      const hidden = (id: string) => {
-        const n = Number(id);
+      const hidden = (app: AppIcon) => {
+        if (app.page !== 1) return false;
+        const n = Number(app.id);
         return !Number.isNaN(n) && n > limit;
       };
 
-      // Drop folders that would become orphaned by hidden apps.
       setFolders((prev) =>
         prev.filter(
-          (f) => f.page !== 1 || f.appIds.every((id) => !hidden(id))
+          (f) => f.page !== 1 || f.appIds.every((id) => {
+            const targetApp = apps.find(a => a.id === id);
+            return targetApp ? !hidden(targetApp) : true;
+          })
         )
       );
       setApps((prev) =>
         prev.map((app) =>
-          hidden(app.id) ? { ...app, groupId: undefined } : app
+          hidden(app) ? { ...app, groupId: undefined } : app
         )
       );
     }
   };
 
-  // ---------- Drag handlers ----------
+  // ---------- Drag & Reanimated tracking state ----------
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoverTarget, setHoverTarget] = useState<
     { kind: "app" | "folder"; id: string } | null
   >(null);
-  const [dragDelta, setDragDelta] = useState<{ x: number; y: number } | null>(
-    null
-  );
+
   const dragStartRef = useRef<{ absX: number; absY: number } | null>(null);
+  const edgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasFlippedRef = useRef<boolean>(false);
+
+  // Reanimated shared values for smooth 60/120fps tracking on UI thread
+  const dragX = useSharedValue(0);
+  const dragY = useSharedValue(0);
 
   const handleDragStart = (id: string, absX: number, absY: number) => {
     dragStartRef.current = { absX, absY };
+    dragX.value = 0;
+    dragY.value = 0;
+    hasFlippedRef.current = false;
     setDraggingId(id);
     setHoverTarget(null);
-    setDragDelta({ x: 0, y: 0 });
+  };
+
+  const handlePageSwitchDuringDrag = (targetPage: number, absX: number, absY: number, id: string) => {
+    if (targetPage < 0 || targetPage >= PAGE_COUNT) return;
+    if (hasFlippedRef.current) return;
+
+    hasFlippedRef.current = true;
+    if (edgeTimerRef.current) {
+      clearTimeout(edgeTimerRef.current);
+      edgeTimerRef.current = null;
+    }
+
+    const dragged = apps.find((a) => a.id === id);
+    if (!dragged) return;
+
+    // 1. Calculate current global screen position of the icon before switching pages
+    const currentGlobalX = dragged.x + dragX.value;
+    const currentGlobalY = dragged.y + dragY.value;
+
+    const newPageX = startX;
+    const newPageY = startY;
+
+    // 2. Update app's page and base position on the target page
+    setApps((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? { ...a, page: targetPage + 1, x: newPageX, y: newPageY }
+          : a
+      )
+    );
+
+    // 3. Switch active page view
+    setPage(targetPage as 0 | 1 | 2);
+
+    // 4. Re-baseline translation values so visual position remains 100% seamless (zero jump)
+    const newDragX = currentGlobalX - newPageX;
+    const newDragY = currentGlobalY - newPageY;
+
+    dragX.value = newDragX;
+    dragY.value = newDragY;
+
+    dragStartRef.current = {
+      absX: absX - newDragX,
+      absY: absY - newDragY,
+    };
+
+    setHoverTarget(null);
   };
 
   const handleDragMove = (id: string, absX: number, absY: number) => {
@@ -418,13 +470,45 @@ export default function Index() {
 
     const deltaX = absX - start.absX;
     const deltaY = absY - start.absY;
-    setDragDelta({ x: deltaX, y: deltaY });
+
+    dragX.value = deltaX;
+    dragY.value = deltaY;
 
     const dragged = apps.find((a) => a.id === id);
     if (!dragged) return;
 
     const centerX = dragged.x + dragged.size / 2 + deltaX;
     const centerY = dragged.y + dragged.size / 2 + deltaY;
+
+    // Reset page flip lock when app center moves back toward middle zone
+    const CENTER_MIN = 60;
+    const CENTER_MAX = width - 60;
+
+    if (centerX >= CENTER_MIN && centerX <= CENTER_MAX) {
+      hasFlippedRef.current = false;
+    }
+
+    // Edge-panning / page-flipping detection strictly when app icon center hits screen edges (0 or width)
+    if (centerX <= 0 && page > 0) {
+      if (!hasFlippedRef.current && !edgeTimerRef.current) {
+        edgeTimerRef.current = setTimeout(() => {
+          handlePageSwitchDuringDrag(page - 1, absX, absY, id);
+          edgeTimerRef.current = null;
+        }, 400);
+      }
+    } else if (centerX >= width && page < PAGE_COUNT - 1) {
+      if (!hasFlippedRef.current && !edgeTimerRef.current) {
+        edgeTimerRef.current = setTimeout(() => {
+          handlePageSwitchDuringDrag(page + 1, absX, absY, id);
+          edgeTimerRef.current = null;
+        }, 400);
+      }
+    } else {
+      if (edgeTimerRef.current && (centerX > 0 && centerX < width)) {
+        clearTimeout(edgeTimerRef.current);
+        edgeTimerRef.current = null;
+      }
+    }
 
     const target = findDropTarget(
       centerX,
@@ -438,15 +522,22 @@ export default function Index() {
   };
 
   const handleDragEnd = async (id: string, absX: number, absY: number) => {
+    if (edgeTimerRef.current) {
+      clearTimeout(edgeTimerRef.current);
+      edgeTimerRef.current = null;
+    }
+    hasFlippedRef.current = false;
+
     const start = dragStartRef.current;
     const dragged = apps.find((a) => a.id === id);
     dragStartRef.current = null;
 
     if (start && dragged && absX >= 0 && absY >= 0) {
-      // All folder creation is page-scoped — this works on any page now.
       const currentPage = page + 1;
-      const centerX = dragged.x + dragged.size / 2 + (absX - start.absX);
-      const centerY = dragged.y + dragged.size / 2 + (absY - start.absY);
+      const deltaX = absX - start.absX;
+      const deltaY = absY - start.absY;
+      const centerX = dragged.x + dragged.size / 2 + deltaX;
+      const centerY = dragged.y + dragged.size / 2 + deltaY;
 
       const target = findDropTarget(
         centerX,
@@ -461,11 +552,10 @@ export default function Index() {
 
       if (target?.kind === "app") {
         const targetApp = apps.find((a) => a.id === target.id);
-        // Page checks are belt-and-braces — findDropTarget already filters.
         if (
           targetApp &&
-          PAGE_OF(dragged.id) === currentPage &&
-          PAGE_OF(targetApp.id) === currentPage
+          dragged.page === currentPage &&
+          targetApp.page === currentPage
         ) {
           const groupId = `group-${groupIdCounter.current++}`;
           setApps((prev) =>
@@ -486,7 +576,7 @@ export default function Index() {
               size: iconSize,
               containerHeight,
               appIds: [dragged.id, targetApp.id],
-              page: currentPage, // NEW — folder remembers its page
+              page: currentPage,
             },
           ];
           setFolders(nextFolders);
@@ -496,7 +586,7 @@ export default function Index() {
         if (
           targetFolder &&
           targetFolder.page === currentPage &&
-          PAGE_OF(dragged.id) === currentPage
+          dragged.page === currentPage
         ) {
           setApps((prev) =>
             prev.map((a) =>
@@ -511,15 +601,28 @@ export default function Index() {
           );
           setFolders(nextFolders);
         }
+      } else {
+        const finalX = Math.max(0, Math.min(width - iconSize, dragged.x + deltaX));
+        const finalY = Math.max(0, Math.min(height - 200, dragged.y + deltaY));
+        setApps((prev) =>
+          prev.map((a) =>
+            a.id === id ? { ...a, x: finalX, y: finalY } : a
+          )
+        );
       }
+
+      const pageOfHelper = (appId: string) => {
+        const found = apps.find(a => a.id === appId);
+        return found ? found.page : 1;
+      };
 
       const foldersSnapshot = nextFolders.map((f) => ({ appIds: f.appIds }));
 
-      if (await isTaskSatisfied(foldersSnapshot, PAGE_OF)) {
+      if (await isTaskSatisfied(foldersSnapshot, pageOfHelper)) {
         const log = await completeTask({
           folders: foldersSnapshot,
           targetId: String(foldersSnapshot.flatMap((f) => f.appIds).length),
-          pageOf: PAGE_OF,
+          pageOf: pageOfHelper,
         });
 
         if (log) {
@@ -530,9 +633,18 @@ export default function Index() {
     }
 
     setDraggingId(null);
-    setDragDelta(null);
     setHoverTarget(null);
+    dragX.value = 0;
+    dragY.value = 0;
   };
+
+  // Animated style for floating drag ghost locked to finger position
+  const floatingAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: dragX.value },
+      { translateY: dragY.value },
+    ],
+  }));
 
   // ---------- Page swipe ----------
   const swipe = Gesture.Pan()
@@ -550,8 +662,7 @@ export default function Index() {
   // ---------- Derived ----------
   const visibleApps = apps.filter((a) => {
     if (a.groupId) return false;
-    const p = PAGE_OF(a.id);
-    if (p !== page + 1) return false;
+    if (a.page !== page + 1) return false;
 
     if (page === 0) {
       const limit = scatteredAppCountFor(layoutMode);
@@ -563,25 +674,27 @@ export default function Index() {
     return true;
   });
   
-//Reset Button
   const handleReset = () => { 
-  setApps(
-    [...APPS, ...APPS_PAGE_2, ...APPS_PAGE_3].map((a) => ({
+    setApps([
+      ...APPS.map(a => ({ ...a, page: 1 })),
+      ...APPS_PAGE_2.map(a => ({ ...a, page: 2 })),
+      ...APPS_PAGE_3.map(a => ({ ...a, page: 3 }))
+    ].map((a) => ({
       ...a,
       groupId: undefined,
-    }))
-  );
-  setFolders([]);
-  groupIdCounter.current = 0;
-  setLayoutMode("grid");
-  setPage(0);
-  dragStartRef.current = null;
-  setDraggingId(null);
-  setDragDelta(null);
-  setHoverTarget(null);
-};
+    })));
+    setFolders([]);
+    groupIdCounter.current = 0;
+    setLayoutMode("grid");
+    setPage(0);
+    dragStartRef.current = null;
+    setDraggingId(null);
+    setHoverTarget(null);
+    hasFlippedRef.current = false;
+    dragX.value = 0;
+    dragY.value = 0;
+  };
 
-  // Only folders that live on the current page render.
   const visibleFolders = folders.filter((f) => f.page === page + 1);
 
   const draggedApp = draggingId
@@ -654,18 +767,19 @@ export default function Index() {
             />
           )}
 
-          {/* Floating drag ghost */}
-          {draggedApp && dragDelta && (
-            <View
+          {/* Floating drag ghost perfectly tracked to finger position */}
+          {draggedApp && (
+            <Animated.View
               pointerEvents="none"
               style={[
                 styles.floatingIcon,
                 {
-                  left: draggedApp.x + dragDelta.x,
-                  top: draggedApp.y + dragDelta.y,
+                  left: draggedApp.x,
+                  top: draggedApp.y,
                   width: draggedApp.size,
                   height: draggedApp.containerHeight,
                 },
+                floatingAnimatedStyle,
               ]}
             >
               <Image
@@ -679,7 +793,7 @@ export default function Index() {
               <Text numberOfLines={1} style={styles.appLabel}>
                 {draggedApp.label}
               </Text>
-            </View>
+            </Animated.View>
           )}
 
           {/* Pager bar */}
@@ -833,18 +947,6 @@ const styles = StyleSheet.create({
     gap: 16,
     zIndex: 10,
   },
-  pageButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  pageButtonDisabled: { opacity: 0.35 },
-  pageButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
   dots: {
     flexDirection: "row",
     gap: 6,
@@ -860,12 +962,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.4)",
   },
   dotActive: { backgroundColor: "white" },
-
   resetRow: {
-  position: "absolute",
-  bottom: 40,
-  alignSelf: "center",
-  zIndex: 10,
+    position: "absolute",
+    bottom: 40,
+    alignSelf: "center",
+    zIndex: 10,
   },
   resetButton: {
     backgroundColor: "black",
