@@ -16,8 +16,13 @@ import {
 } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 import { Path, Svg } from "react-native-svg";
-import { completeTask, isTaskSatisfied } from "./experimentSession";
-
+import {
+  completeTask,
+  getCurrentTrial,
+  isTaskSatisfied,
+  layoutStyleForTask,
+  pageStyleForTask,
+} from "./experimentSession";
 // SVG container dimensions
 const height = 900;
 const width = 400;
@@ -32,6 +37,7 @@ type AppIcon = {
   size: number;
   groupId?: string;
   containerHeight: number;
+  page: number; // 1-based
 };
 
 type Folder = {
@@ -43,6 +49,7 @@ type Folder = {
   containerHeight: number;
   appIds: string[];
   open: boolean;
+  page: number; // 1-based — folder lives on this page
 };
 
 // Icon positions
@@ -56,12 +63,6 @@ const LabelHeight = 15;
 
 // ── Pager config ─────────────────────────────────────────────
 const PAGE_COUNT = 3;
-
-const PAGE_OF = (id: string): number => {
-  if (id.startsWith("p2-")) return 2;
-  if (id.startsWith("p3-")) return 3;
-  return 1;
-};
 // ─────────────────────────────────────────────────────────────
 
 const labels = [
@@ -73,11 +74,10 @@ const labels = [
   "Search", "Socials", "Contacts", "Calculator",
 ];
 
-// ── Grid layout (unchanged) ──────────────────────────────────
+// ── Grid layout ──────────────────────────────────────────────
 const APPS: AppIcon[] = labels.map((label, i) => {
   const col = i % numColumns;
   const row = Math.floor(i / numColumns);
-
   return {
     id: String(i + 1),
     label,
@@ -85,39 +85,54 @@ const APPS: AppIcon[] = labels.map((label, i) => {
     y: startY + row * Yspacing,
     size: iconSize,
     containerHeight: iconSize + LabelHeight,
+    page: 1,
   };
 });
 
-// ── NEW: scattered layout for page 1 ─────────────────────────
-const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
+// ── Clustered & scattered layouts for page 1 ─────────────────
+// Clustered: 12 apps in 3 full rows of 4 (rows 3-5 stay empty).
+//   [A, A, A, A]
+//   [A, A, A, A]
+//   [A, A, A, A]
+//   [x, x, x, x]
+//   [x, x, x, x]
+const CLUSTERED_CELLS: Array<[row: number, col: number]> = [
   [0, 0], [0, 1], [0, 2], [0, 3],
-  [1, 2], [1, 3],
-  [2, 2], [2, 3],
-  [3, 0], [3, 1],[3, 2], [3, 3],
-  [4, 0], [4, 1], [4, 2], [4, 3],
-  [5, 0], [5, 1], [5, 2], [5, 3],
+  [1, 0], [1, 1], [1, 2], [1, 3],
+  [2, 0], [2, 1], [2, 2], [2, 3],
 ];
 
-// Same as #1 for now — replace when you want a different scatter.
+const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
+  [0, 0], [0, 2],
+  [1, 0], [1, 2], 
+  [2, 1], [2, 3],
+  [3, 0], [3, 1], [3, 3],
+  [4, 1], [4, 2], 
+  [5, 0], [5, 3],
+];
 const SCATTERED_CELLS_2: Array<[row: number, col: number]> = [
   [0, 0], [0, 1], [0, 2], [0, 3],
   [1, 2], [1, 3],
   [2, 2], [2, 3],
-  [3, 0],[3, 1], [3, 2], [3, 3],
+  [3, 0], [3, 1], [3, 2], [3, 3],
 ];
-
-// Same as #1 for now — replace when you want a different scatter.
 const SCATTERED_CELLS_3: Array<[row: number, col: number]> = [
   [0, 0], [0, 1],
-  [1, 0], [1, 1], 
+  [1, 0], [1, 1],
   [2, 2], [2, 3],
   [3, 2], [3, 3],
 ];
 
-export type LayoutMode = "grid" | "scattered-1" | "scattered-2" | "scattered-3";
+export type LayoutMode =
+  | "grid"
+  | "clustered"
+  | "scattered-1"
+  | "scattered-2"
+  | "scattered-3";
 
 const LAYOUT_CYCLE: LayoutMode[] = [
   "grid",
+  "clustered",
   "scattered-1",
   "scattered-2",
   "scattered-3",
@@ -127,6 +142,7 @@ const SCATTERED_CELLS_BY_MODE: Record<
   Exclude<LayoutMode, "grid">,
   Array<[row: number, col: number]>
 > = {
+  clustered: CLUSTERED_CELLS,
   "scattered-1": SCATTERED_CELLS_1,
   "scattered-2": SCATTERED_CELLS_2,
   "scattered-3": SCATTERED_CELLS_3,
@@ -141,7 +157,8 @@ function buildScatteredApps(cells: Array<[number, number]>): AppIcon[] {
       x: startX + col * Xspacing,
       y: startY + row * Yspacing,
       size: iconSize,
-      containerHeight: iconSize + LabelHeight, // baseline uses `containerHeight` (no +LabelHeight)
+      containerHeight: iconSize + LabelHeight,
+      page: 1,
     };
   });
 }
@@ -150,53 +167,37 @@ const APPS_SCATTERED_BY_MODE: Record<
   Exclude<LayoutMode, "grid">,
   AppIcon[]
 > = {
+  clustered: buildScatteredApps(CLUSTERED_CELLS),
   "scattered-1": buildScatteredApps(SCATTERED_CELLS_1),
   "scattered-2": buildScatteredApps(SCATTERED_CELLS_2),
   "scattered-3": buildScatteredApps(SCATTERED_CELLS_3),
 };
 
-/** How many page-1 apps to show for the current mode (undefined = all). */
 function scatteredAppCountFor(mode: LayoutMode): number | undefined {
   return mode === "grid" ? undefined : SCATTERED_CELLS_BY_MODE[mode].length;
 }
 
-/** The positioned apps for the given mode. */
 function appsForMode(mode: LayoutMode): AppIcon[] {
   return mode === "grid" ? APPS : APPS_SCATTERED_BY_MODE[mode];
 }
 
-/** Human-readable label for the toggle button. */
 const LAYOUT_LABEL: Record<LayoutMode, string> = {
   grid: "Grid",
+  clustered: "Clustered (12)",
   "scattered-1": "Scattered 1",
   "scattered-2": "Scattered 2",
   "scattered-3": "Scattered 3",
 };
-// ─────────────────────────────────────────────────────────────
 
 // ── Decoy pages ──────────────────────────────────────────────
 const PAGE_2_LABELS = [
-  "Gym",
-  "Travel",
-  "Shop",
-  "News",
-  "Recipes",
-  "Finance",
-  "Scanner",
-  "Translate",
-  "Paint",
-  "Journal"
+  "Gym", "Travel", "Shop", "News",
+  "Recipes", "Finance", "Scanner", "Translate",
+  "Paint", "Journal",
 ];
-
 const PAGE_3_LABELS = [
-  "Transport",
-  "Shop",
-  "Delivery",
-  "Food",
-  "Journal",
-  "Movies",
-  "Games",
-  "Compass",
+  "Transport", "Shop", "Delivery", "Food",
+  "Journal", "Movies", "Games", "Compass",
 ];
 
 function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
@@ -210,6 +211,7 @@ function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
       y: startY + row * Yspacing,
       size: iconSize,
       containerHeight: iconSize + LabelHeight,
+      page: pageIndex,
     };
   });
 }
@@ -220,20 +222,16 @@ const APPS_PAGE_3 = buildDecoyPage(PAGE_3_LABELS, 3);
 
 function pointInPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
-
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const xi = polygon[i].x;
     const yi = polygon[i].y;
     const xj = polygon[j].x;
     const yj = polygon[j].y;
-
     const intersects =
       yi > point.y !== yj > point.y &&
       point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
-
     if (intersects) inside = !inside;
   }
-
   return inside;
 }
 
@@ -264,13 +262,11 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           }),
         ])
       );
-
       animRef.current.start();
     } else {
       animRef.current?.stop();
       rotation.setValue(0);
     }
-
     return () => {
       animRef.current?.stop();
     };
@@ -291,20 +287,26 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           width: app.size,
           height: app.containerHeight,
           transform: [{ rotate }],
+          shadowColor: "black",
+          shadowOffset: selected
+            ? { width: 0, height: 2}
+            : { width: 0, height: 0 },
+          shadowOpacity: selected ? 0.5 : 0.3,
+          shadowRadius: selected ? 2 : 1,
         },
       ]}
     >
-      <Image source={require("../../assets/LassoToolAssets/app.png")} style={{
-          width: app.size,
-          height: app.size,
+      <Image
+        source={require("../../assets/LassoToolAssets/app.png")}
+        style={{ 
+          width: app.size, 
+          height: app.size, 
           borderRadius: 14,
-          // borderColor: selected ? "blue" : "transparent",
-          // borderWidth: selected ? 2 : 0,
-          
         }}
       />
-
-      <Text numberOfLines={1} style={{
+      <Text
+        numberOfLines={1}
+        style={{
           width: app.size,
           height: LabelHeight,
           lineHeight: LabelHeight,
@@ -358,7 +360,6 @@ function FolderTile({
           ))}
         </View>
       </TouchableOpacity>
-
       <Text numberOfLines={1} style={styles.folderLabel}>
         {folder.label}
       </Text>
@@ -381,61 +382,94 @@ export default function Index() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const groupIdCounter = useRef(0);
 
-  // ── NEW: page-1 layout toggle ─────────────────────────────
-  // ── Layout mode: grid → scattered-1 → scattered-2 → scattered-3 → grid ──
+  // ── Layout mode ──────────────────────────────────────────
+  // Default to grid; the mount effect below auto-switches to `clustered`
+  // for clustered conditions (A, C) and to `scattered-1` for scattered
+  // conditions (B, D).
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
 
-  const cycleLayout = () => {
-    const next =
-      LAYOUT_CYCLE[(LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length];
+  const applyLayout = (next: LayoutMode) => {
     setLayoutMode(next);
 
-    // Reposition page-1 apps in place so groupIds and folders survive.
     const positions = appsForMode(next);
     const posById = new Map(positions.map((a) => [a.id, a]));
 
     setApps((prev) =>
       prev.map((app) => {
+        if (app.page !== 1) return app;
         const pos = posById.get(app.id);
         return pos ? { ...app, x: pos.x, y: pos.y } : app;
       })
     );
 
-    // When entering a scattered mode, drop folders/groups that reference
-    // page-1 apps which will now be hidden.
     if (next !== "grid") {
       const limit = SCATTERED_CELLS_BY_MODE[next].length;
-      const hidden = (id: string) => {
-        const n = Number(id);
+      const hidden = (app: AppIcon) => {
+        if (app.page !== 1) return false;
+        const n = Number(app.id);
         return !Number.isNaN(n) && n > limit;
       };
 
-      // index.tsx only — clears selection of hidden apps
-      setSelectedIds((prev) => prev.filter((id) => !hidden(id)));
+      setSelectedIds((prev) => {
+        const hiddenSet = new Set(
+          apps.filter((a) => hidden(a)).map((a) => a.id)
+        );
+        return prev.filter((id) => !hiddenSet.has(id));
+      });
 
-      // both files — drops folders that would become orphaned
       setFolders((prev) =>
-        prev.filter((f) => f.appIds.every((id) => !hidden(id)))
+        prev.filter(
+          (f) =>
+            f.page !== 1 ||
+            f.appIds.every((id) => {
+              const targetApp = apps.find((a) => a.id === id);
+              return targetApp ? !hidden(targetApp) : true;
+            })
+        )
       );
       setApps((prev) =>
-        prev.map((app) => (hidden(app.id) ? { ...app, groupId: undefined } : app))
+        prev.map((app) =>
+          hidden(app) ? { ...app, groupId: undefined } : app
+        )
       );
     }
   };
-  // ────────────────────────────────────────────────────────────
 
-  // ── NEW: pager visibility toggle (hidden by default) ──────
+  const cycleLayout = () => {
+    const next =
+      LAYOUT_CYCLE[(LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length];
+    applyLayout(next);
+  };
+
+  // Auto-set the layout for the current trial's condition:
+  //   clustered conditions (A, C) → "clustered"
+  //   scattered conditions (B, D) → "scattered-1"
+    useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const trial = await getCurrentTrial();
+      if (cancelled || !trial) return;
+      const style = layoutStyleForTask(trial.trial.taskId);
+      applyLayout(style === "clustered" ? "clustered" : "scattered-1");
+
+      if (pageStyleForTask(trial.trial.taskId) === "multi") {
+        setShowPager(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ─────────────────────────────────────────────────────────
+
   const [showPager, setShowPager] = useState(false);
-  // ────────────────────────────────────────────────────────────
-
-  // ── Pager state (tap-based, no gesture) ───────────────────
   const [page, setPage] = useState<0 | 1 | 2>(0);
 
   const goToPage = (next: number) => {
     if (next < 0 || next >= PAGE_COUNT) return;
     setPage(next as 0 | 1 | 2);
   };
-  // ────────────────────────────────────────────────────────────
 
   const toSvgPath = (points: Point[]) =>
     points
@@ -445,7 +479,6 @@ export default function Index() {
       })
       .join(" ");
 
-  // These helpers are called on the JS thread via runOnJS.
   const startLasso = (point: Point) => {
     pathRef.current = [point];
     setCurrentPath([point]);
@@ -457,14 +490,14 @@ export default function Index() {
     setCurrentPath(nextPath);
   };
 
-  const finishLasso = () => {
+    const finishLasso = () => {
     const polygon = pathRef.current;
     pathRef.current = [];
     setCurrentPath([]);
 
     if (polygon.length < 3) return;
 
-    // Only apps that exist on the currently visible page are lassoable.
+    // Lassos only apps visible on the current page.
     const pageIds = new Set(visibleApps.map((a) => a.id));
 
     const insideIds = apps
@@ -482,11 +515,8 @@ export default function Index() {
     setSelectedIds((previous) => {
       const next = new Set(previous);
       for (const id of insideIds) {
-        if (next.has(id)) {
-          next.delete(id); // already selected → unselect
-        } else {
-          next.add(id); // not selected → select
-        }
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
       }
       return [...next];
     });
@@ -499,7 +529,6 @@ export default function Index() {
     .onUpdate((event) => {
       runOnJS(addLassoPoint)({ x: event.x, y: event.y });
     })
-    // onFinalize also handles a gesture that is cancelled.
     .onFinalize(() => {
       runOnJS(finishLasso)();
     });
@@ -530,7 +559,7 @@ export default function Index() {
         easing: Easing.in(Easing.quad),
         useNativeDriver: true,
       }).start();
-    }, 1500); // visible for 1.5s before fading out
+    }, 1500);
   };
 
   const groupSelectedApps = async () => {
@@ -551,6 +580,8 @@ export default function Index() {
       )
     );
 
+    // Folder is placed on the page of the first selected app. Its appIds
+    // may span pages — this is what allows multi-page tasks to complete.
     const firstApp = selectedApps[0];
     if (!firstApp) return;
 
@@ -563,6 +594,7 @@ export default function Index() {
       containerHeight: iconSize + LabelHeight,
       appIds: selectedIds,
       open: false,
+      page: firstApp.page,
     };
 
     const nextFolders = [...folders, newFolder];
@@ -571,11 +603,16 @@ export default function Index() {
 
     const foldersSnapshot = nextFolders.map((f) => ({ appIds: f.appIds }));
 
-    if (await isTaskSatisfied(foldersSnapshot, PAGE_OF)) {
+    const pageOfHelper = (appId: string) => {
+      const found = apps.find((a) => a.id === appId);
+      return found ? found.page : 1;
+    };
+
+    if (await isTaskSatisfied(foldersSnapshot, pageOfHelper)) {
       const log = await completeTask({
         folders: foldersSnapshot,
         targetId: String(foldersSnapshot.flatMap((f) => f.appIds).length),
-        pageOf: PAGE_OF,
+        pageOf: pageOfHelper,
       });
 
       if (log) {
@@ -592,24 +629,28 @@ export default function Index() {
     setSelectedIds([]);
     setFolders([]);
     groupIdCounter.current = 0;
+    setLayoutMode("grid");
   };
 
-  // ── Visible apps for the current page ──────────────────────
   const visibleApps = apps.filter((a) => {
     if (a.groupId) return false;
-    const p = PAGE_OF(a.id);
-    if (p !== page + 1) return false;
+    if (a.page !== page + 1) return false;
 
     if (page === 0) {
       const limit = scatteredAppCountFor(layoutMode);
       if (limit !== undefined) {
-        const n = Number(a.id) - 1;
-        if (Number.isNaN(n) || n >= limit) return false;
+        const n = Number(a.id);
+        // Only hide the numbered page-1 apps that fall outside the layout's
+        // visible-cell count. Decoy apps (ids like "p2-3") have NaN id and
+        // must NOT be hidden — hiding them breaks lasso selection on page 1
+        // for any decoy that ends up here.
+        if (!Number.isNaN(n) && n > limit) return false;
       }
     }
     return true;
   });
-  // ────────────────────────────────────────────────────────────
+
+  const visibleFolders = folders.filter((f) => f.page === page + 1);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -620,7 +661,6 @@ export default function Index() {
           contentFit="cover"
         />
 
-        {/* App grid for the active page — plain View, no gesture wrapper */}
         <View style={styles.pageContainer}>
           {visibleApps.map((app) => (
             <JigglingAppIcon
@@ -631,7 +671,7 @@ export default function Index() {
           ))}
         </View>
 
-        {folders.map((folder) => (
+        {visibleFolders.map((folder) => (
           <FolderTile
             key={folder.id}
             folder={folder}
@@ -648,7 +688,6 @@ export default function Index() {
           />
         ))}
 
-        {/* Lasso overlay — transparent to touches so buttons are tappable */}
         <GestureDetector gesture={drag}>
           <View style={styles.svgContainer}>
             <Svg height={height * 0.7} width={width} pointerEvents="none">
@@ -667,7 +706,6 @@ export default function Index() {
           </View>
         </GestureDetector>
 
-        {/* Page navigation + dots — only visible when showPager is true */}
         {showPager && (
           <View style={styles.pagerBar} pointerEvents="box-none">
             <TouchableOpacity
@@ -720,10 +758,11 @@ export default function Index() {
           </TouchableOpacity>
         </View>
 
-        {/* REMOVE LATER: dev toggles */} 
         <View style={styles.toggleRow}>
           <TouchableOpacity style={styles.toggleButton} onPress={cycleLayout}>
-          <Text style={styles.toggleText}>Layout: {LAYOUT_LABEL[layoutMode]}</Text>
+            <Text style={styles.toggleText}>
+              Layout: {LAYOUT_LABEL[layoutMode]}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -748,10 +787,7 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-  },
+  container: { flex: 1, alignItems: "center" },
   pageContainer: {
     position: "absolute",
     top: 0,
@@ -778,14 +814,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
-  pageButtonDisabled: {
-    opacity: 0.35,
-  },
-  pageButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  pageButtonDisabled: { opacity: 0.35 },
+  pageButtonText: { color: "white", fontSize: 14, fontWeight: "600" },
   dots: {
     flexDirection: "row",
     gap: 6,
@@ -800,9 +830,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: "rgba(255,255,255,0.4)",
   },
-  dotActive: {
-    backgroundColor: "white",
-  },
+  dotActive: { backgroundColor: "white" },
   buttonRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -827,8 +855,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-
-  // NEW styles
   toggleRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -842,21 +868,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 100,
   },
-  toggleText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
+  toggleText: { color: "white", fontSize: 12, fontWeight: "700" },
   app: {
     position: "absolute",
     alignItems: "center",
     justifyContent: "flex-start",
   },
-  folderWrapper: {
-    position: "absolute",
-    alignItems: "center",
-  },
+  folderWrapper: { position: "absolute", alignItems: "center" },
   folderTile: {
     borderRadius: 14,
     backgroundColor: "rgba(99, 161, 247, 0.9)",
@@ -876,12 +894,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 3,
   },
-  folderMini: {
-    width: 13,
-    height: 13,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
+  folderMini: { width: 13, height: 13, borderRadius: 3, overflow: "hidden" },
   folderLabel: {
     width: iconSize,
     height: LabelHeight,

@@ -5,7 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Platform, StyleSheet, Text, View } from "react-native";
 import {
   clearAllExperimentData,
+  CONDITION_MATRIX,
   CSV_HEADERS,
+  ExperimentCondition,
   getCurrentTrial,
   getLogs,
   getOrCreateParticipantId,
@@ -23,6 +25,11 @@ type CurrentTrial = {
   total: number;
   trial: TrialPlanEntry;
 };
+
+function conditionFromTaskId(taskId: string): ExperimentCondition {
+  // Task ids are prefixed with their condition letter: A-/B-/C-/D-
+  return (taskId.charAt(0) as ExperimentCondition) ?? "A";
+}
 
 export default function ExperimentScreen() {
   const [participantId, setParticipantId] = useState("");
@@ -166,6 +173,8 @@ export default function ExperimentScreen() {
   const spec = TASKS[currentTrial.trial.taskId];
   const conditionLabel =
     currentTrial.trial.condition === "baseline" ? "Baseline" : "Lasso";
+  const expCondition = conditionFromTaskId(currentTrial.trial.taskId);
+  const expConditionLabel = CONDITION_MATRIX[expCondition].label;
 
   if (phase === "idle") {
     return (
@@ -175,6 +184,7 @@ export default function ExperimentScreen() {
         </Text>
         <Text style={styles.info}>Participant: {participantId}</Text>
         <Text style={styles.info}>Condition: {conditionLabel}</Text>
+        <Text style={styles.info}>Layout cell: {expConditionLabel}</Text>
         <Text style={styles.info}>Task: {spec.label}</Text>
 
         <Text style={styles.brief}>{spec.brief}</Text>
@@ -200,6 +210,10 @@ export default function ExperimentScreen() {
           <Text style={styles.info}>
             Condition:{" "}
             {lastLog.condition === "baseline" ? "Baseline" : "Lasso"}
+          </Text>
+          <Text style={styles.info}>
+            Layout cell:{" "}
+            {CONDITION_MATRIX[conditionFromTaskId(lastLog.taskId)].label}
           </Text>
           <Text style={styles.info}>
             Task: {TASKS[lastLog.taskId].label}
