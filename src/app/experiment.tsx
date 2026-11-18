@@ -16,7 +16,7 @@ import {
   toCsvRow,
   TrialLog,
   TrialPlanEntry,
-} from "./experimentSession";
+} from "../lib/experimentSession";
 
 type Phase = "idle" | "done" | "complete";
 

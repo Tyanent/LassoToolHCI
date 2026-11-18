@@ -3,28 +3,28 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
+    Gesture,
+    GestureDetector,
+    GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
 } from "react-native-reanimated";
 import {
-  completeTask,
-  getCurrentTrial,
-  isTaskSatisfied,
-  layoutStyleForTask,
-  pageStyleForTask,
-} from "./experimentSession";
+    completeTask,
+    getCurrentTrial,
+    isTaskSatisfied,
+    layoutStyleForTask,
+    pageStyleForTask,
+} from "../lib/experimentSession";
 // ---------- Layout ----------
 const height = 900;
 const width = 380;

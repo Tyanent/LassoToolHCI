@@ -22,7 +22,7 @@ import {
   isTaskSatisfied,
   layoutStyleForTask,
   pageStyleForTask,
-} from "./experimentSession";
+} from "../lib/experimentSession";
 // SVG container dimensions
 const height = 900;
 const width = 400;
