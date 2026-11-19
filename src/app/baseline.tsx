@@ -2,28 +2,24 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import {
-    Gesture,
-    GestureDetector,
-    GestureHandlerRootView,
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
 } from "react-native-reanimated";
+import ExperimentTimer from "../components/ExperimentTimer";
 import {
-    completeTask,
-    getCurrentTrial,
-    isTaskSatisfied,
-    layoutStyleForTask,
-    pageStyleForTask,
+  completeTask,
+  getCurrentTrial,
+  isTaskSatisfied,
+  layoutStyleForTask,
+  pageStyleForTask,
 } from "../lib/experimentSession";
 // ---------- Layout ----------
 const height = 900;
@@ -61,12 +57,30 @@ type Folder = {
 };
 
 const labels = [
-  "Mail", "Photos", "Music", "Maps",
-  "Camera", "Notes", "Clock", "Weather",
-  "Settings", "Phone", "Wallet", "Messages",
-  "Calendar", "Reminders", "Stocks", "Books",
-  "Podcasts", "Health", "Files", "Bank",
-  "Search", "Socials", "Contacts", "Calculator",
+  "Mail",
+  "Photos",
+  "Music",
+  "Maps",
+  "Camera",
+  "Notes",
+  "Clock",
+  "Weather",
+  "Settings",
+  "Phone",
+  "Wallet",
+  "Messages",
+  "Calendar",
+  "Reminders",
+  "Stocks",
+  "Books",
+  "Podcasts",
+  "Health",
+  "Files",
+  "Bank",
+  "Search",
+  "Socials",
+  "Contacts",
+  "Calculator",
 ];
 
 // ---------- Page config ----------
@@ -89,30 +103,57 @@ const APPS: AppIcon[] = labels.map((label, i) => {
 
 // ---------- Clustered & scattered layouts (page 1) ----------
 const CLUSTERED_CELLS: Array<[row: number, col: number]> = [
-  [0, 0], [0, 1], [0, 2], [0, 3],
-  [1, 0], [1, 1], [1, 2], [1, 3],
-  [2, 0], [2, 1], [2, 2], [2, 3],
+  [0, 0],
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [1, 0],
+  [1, 1],
+  [1, 2],
+  [1, 3],
+  [2, 0],
+  [2, 1],
+  [2, 2],
+  [2, 3],
 ];
 
 const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
-  [0, 0], [0, 2],
-  [1, 0], [1, 2], 
-  [2, 1], [2, 3],
-  [3, 0], [3, 1], [3, 3],
-  [4, 1], [4, 2], 
-  [5, 0], [5, 3],
+  [0, 0],
+  [0, 2],
+  [1, 0],
+  [1, 2],
+  [2, 1],
+  [2, 3],
+  [3, 0],
+  [3, 1],
+  [3, 3],
+  [4, 1],
+  [4, 2],
+  [5, 0],
+  [5, 3],
 ];
 const SCATTERED_CELLS_2: Array<[row: number, col: number]> = [
-  [0, 0], [0, 1], [0, 2], [0, 3],
-  [1, 1], [1, 2],
-  [2, 1], [2, 2], [2, 3],
-  [3, 2], [3, 3],
+  [0, 0],
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [1, 1],
+  [1, 2],
+  [2, 1],
+  [2, 2],
+  [2, 3],
+  [3, 2],
+  [3, 3],
 ];
 const SCATTERED_CELLS_3: Array<[row: number, col: number]> = [
-  [0, 0], [0, 1],
-  [1, 0], [1, 1],
-  [2, 2], [2, 3],
-  [3, 2], [3, 3],
+  [0, 0],
+  [0, 1],
+  [1, 0],
+  [1, 1],
+  [2, 2],
+  [2, 3],
+  [3, 2],
+  [3, 3],
 ];
 
 export type LayoutMode =
@@ -155,10 +196,7 @@ function buildScatteredApps(cells: Array<[number, number]>): AppIcon[] {
   });
 }
 
-const APPS_SCATTERED_BY_MODE: Record<
-  Exclude<LayoutMode, "grid">,
-  AppIcon[]
-> = {
+const APPS_SCATTERED_BY_MODE: Record<Exclude<LayoutMode, "grid">, AppIcon[]> = {
   clustered: buildScatteredApps(CLUSTERED_CELLS),
   "scattered-1": buildScatteredApps(SCATTERED_CELLS_1),
   "scattered-2": buildScatteredApps(SCATTERED_CELLS_2),
@@ -185,12 +223,24 @@ const SHOW_LAYOUT_TOGGLE = true;
 
 // ---------- Decoy pages ----------
 const PAGE_2_LABELS = [
-  "Gym", "Travel", "Shop", "News",
-  "Recipes", "Finance", "Scanner", "Translate",
+  "Gym",
+  "Travel",
+  "Shop",
+  "News",
+  "Recipes",
+  "Finance",
+  "Scanner",
+  "Translate",
 ];
 const PAGE_3_LABELS = [
-  "Podcasts 2", "Health 2", "Files 2", "Bank 2",
-  "Notes 2", "Books 2", "Stocks 2", "Reminders 2",
+  "Podcasts 2",
+  "Health 2",
+  "Files 2",
+  "Bank 2",
+  "Notes 2",
+  "Books 2",
+  "Stocks 2",
+  "Reminders 2",
 ];
 
 function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
@@ -219,7 +269,7 @@ const APPS_PAGE_3 = buildDecoyPage(PAGE_3_LABELS, 3);
 function isHiddenByLayout(
   app: AppIcon,
   currentPage: number,
-  mode: LayoutMode
+  mode: LayoutMode,
 ): boolean {
   if (app.page !== currentPage) return false;
   if (currentPage !== 1) return false;
@@ -239,7 +289,7 @@ function findDropTarget(
   draggedId: string,
   currentPage: number,
   layoutMode: LayoutMode,
-  maxDistance: number = 60
+  maxDistance: number = 60,
 ): { kind: "app"; id: string } | { kind: "folder"; id: string } | null {
   let best: { kind: "app" | "folder"; id: string } | null = null;
   let bestDist = maxDistance;
@@ -404,7 +454,7 @@ export default function Index() {
         if (app.page !== 1) return app;
         const pos = posById.get(app.id);
         return pos ? { ...app, x: pos.x, y: pos.y } : app;
-      })
+      }),
     );
 
     if (next !== "grid") {
@@ -422,13 +472,11 @@ export default function Index() {
             f.appIds.every((id) => {
               const targetApp = apps.find((a) => a.id === id);
               return targetApp ? !hidden(targetApp) : true;
-            })
-        )
+            }),
+        ),
       );
       setApps((prev) =>
-        prev.map((app) =>
-          hidden(app) ? { ...app, groupId: undefined } : app
-        )
+        prev.map((app) => (hidden(app) ? { ...app, groupId: undefined } : app)),
       );
     }
   };
@@ -436,7 +484,9 @@ export default function Index() {
   const cycleLayout = () => {
     if (page !== 0) return;
     const next =
-      LAYOUT_CYCLE[(LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length];
+      LAYOUT_CYCLE[
+        (LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length
+      ];
     applyLayout(next);
   };
 
@@ -447,9 +497,9 @@ export default function Index() {
       if (cancelled || !trial) return;
       const style = layoutStyleForTask(trial.trial.taskId);
       applyLayout(style === "clustered" ? "clustered" : "scattered-1");
-      
+
       if (pageStyleForTask(trial.trial.taskId) === "multi") {
-              setShowPager(true);
+        setShowPager(true);
       }
     })();
     return () => {
@@ -460,9 +510,10 @@ export default function Index() {
 
   // ---------- Drag tracking ----------
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [hoverTarget, setHoverTarget] = useState<
-    { kind: "app" | "folder"; id: string } | null
-  >(null);
+  const [hoverTarget, setHoverTarget] = useState<{
+    kind: "app" | "folder";
+    id: string;
+  } | null>(null);
 
   const dragHomeRef = useRef<{
     id: string;
@@ -509,7 +560,7 @@ export default function Index() {
     targetPage: number,
     absX: number,
     absY: number,
-    id: string
+    id: string,
   ) => {
     if (targetPage < 0 || targetPage >= PAGE_COUNT) return;
     if (hasFlippedRef.current) return;
@@ -547,9 +598,7 @@ export default function Index() {
     // Update x/y only — leave `page` untouched so validation can see the
     // app's origin page after it's dropped into a folder.
     setApps((prev) =>
-      prev.map((a) =>
-        a.id === id ? { ...a, x: newPageX, y: newPageY } : a
-      )
+      prev.map((a) => (a.id === id ? { ...a, x: newPageX, y: newPageY } : a)),
     );
 
     setPage(targetPage as 0 | 1 | 2);
@@ -610,7 +659,7 @@ export default function Index() {
       folders,
       id,
       home.page,
-      layoutMode
+      layoutMode,
     );
     setHoverTarget(target);
   };
@@ -648,7 +697,7 @@ export default function Index() {
       folders,
       id,
       currentPage,
-      layoutMode
+      layoutMode,
     );
 
     let nextFolders = folders;
@@ -663,10 +712,8 @@ export default function Index() {
         const groupId = `group-${groupIdCounter.current++}`;
         setApps((prev) =>
           prev.map((a) =>
-            a.id === home.id || a.id === targetApp.id
-              ? { ...a, groupId }
-              : a
-          )
+            a.id === home.id || a.id === targetApp.id ? { ...a, groupId } : a,
+          ),
         );
 
         nextFolders = [
@@ -689,13 +736,11 @@ export default function Index() {
       const targetFolder = folders.find((f) => f.id === target.id);
       if (targetFolder) {
         setApps((prev) =>
-          prev.map((a) =>
-            a.id === id ? { ...a, groupId: target.id } : a
-          )
+          prev.map((a) => (a.id === id ? { ...a, groupId: target.id } : a)),
         );
 
         nextFolders = folders.map((f) =>
-          f.id === target.id ? { ...f, appIds: [...f.appIds, id] } : f
+          f.id === target.id ? { ...f, appIds: [...f.appIds, id] } : f,
         );
         setFolders(nextFolders);
         handledAsFolderOp = true;
@@ -704,20 +749,12 @@ export default function Index() {
 
     if (!handledAsFolderOp) {
       // Free drop — commit the landing page and position.
-      const finalX = Math.max(
-        0,
-        Math.min(width - iconSize, home.x + deltaX)
-      );
-      const finalY = Math.max(
-        0,
-        Math.min(height - 200, home.y + deltaY)
-      );
+      const finalX = Math.max(0, Math.min(width - iconSize, home.x + deltaX));
+      const finalY = Math.max(0, Math.min(height - 200, home.y + deltaY));
       setApps((prev) =>
         prev.map((a) =>
-          a.id === id
-            ? { ...a, x: finalX, y: finalY, page: currentPage }
-            : a
-        )
+          a.id === id ? { ...a, x: finalX, y: finalY, page: currentPage } : a,
+        ),
       );
     }
 
@@ -748,10 +785,7 @@ export default function Index() {
   };
 
   const floatingAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: dragX.value },
-      { translateY: dragY.value },
-    ],
+    transform: [{ translateX: dragX.value }, { translateY: dragY.value }],
   }));
 
   // ---------- Page swipe ----------
@@ -792,7 +826,7 @@ export default function Index() {
         ...APPS.map((a) => ({ ...a, page: 1 })),
         ...APPS_PAGE_2.map((a) => ({ ...a, page: 2 })),
         ...APPS_PAGE_3.map((a) => ({ ...a, page: 3 })),
-      ].map((a) => ({ ...a, groupId: undefined }))
+      ].map((a) => ({ ...a, groupId: undefined })),
     );
     setFolders([]);
     groupIdCounter.current = 0;
@@ -809,9 +843,7 @@ export default function Index() {
 
   const visibleFolders = folders.filter((f) => f.page === page + 1);
 
-  const draggedApp = draggingId
-    ? apps.find((a) => a.id === draggingId)
-    : null;
+  const draggedApp = draggingId ? apps.find((a) => a.id === draggingId) : null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -822,6 +854,8 @@ export default function Index() {
             style={StyleSheet.absoluteFill}
             contentFit="cover"
           />
+
+          <ExperimentTimer />
 
           <View style={styles.chipColumn} pointerEvents="box-none">
             {SHOW_LAYOUT_TOGGLE && page === 0 && (
@@ -868,11 +902,7 @@ export default function Index() {
           ))}
 
           {hoverTarget && (
-            <DropHighlight
-              target={hoverTarget}
-              apps={apps}
-              folders={folders}
-            />
+            <DropHighlight target={hoverTarget} apps={apps} folders={folders} />
           )}
 
           {draggedApp && (

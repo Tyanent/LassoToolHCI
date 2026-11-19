@@ -61,14 +61,15 @@ type TaskSeed = {
   pages: number; // minimum number of distinct pages that must be used
 };
 
-const EXPERIMENT_TASKS = [//Add New Tasks Here
+const EXPERIMENT_TASKS = [
+  //Add New Tasks Here
   // ── Condition A — clustered · single page ─────────────────
-  { id: "A-3x3",       condition: "A", folders: 3, appsPerFolder: 3, pages: 1 },
-  { id: "A-1x8",       condition: "A", folders: 1, appsPerFolder: 8, pages: 1 },
+  { id: "A-3x3", condition: "A", folders: 3, appsPerFolder: 3, pages: 1 },
+  { id: "A-1x8", condition: "A", folders: 1, appsPerFolder: 8, pages: 1 },
 
   // ── Condition B — scattered · single page ─────────────────
-  { id: "B-3x3",       condition: "B", folders: 3, appsPerFolder: 3, pages: 1 },
-  { id: "B-1x8",       condition: "B", folders: 1, appsPerFolder: 8, pages: 1 },
+  { id: "B-3x3", condition: "B", folders: 3, appsPerFolder: 3, pages: 1 },
+  { id: "B-1x8", condition: "B", folders: 1, appsPerFolder: 8, pages: 1 },
 
   // ── Condition C — clustered · multi page ──────────────────
   { id: "C-1x4-cross", condition: "C", folders: 1, appsPerFolder: 4, pages: 2 },
@@ -114,10 +115,7 @@ export type TaskSpec = TaskShape & {
   id: TaskId;
   label: string;
   brief: string;
-  validate: (
-    folders: FolderGroup[],
-    pageOf: (id: string) => number
-  ) => boolean;
+  validate: (folders: FolderGroup[], pageOf: (id: string) => number) => boolean;
 };
 
 export type TrialLog = {
@@ -132,8 +130,8 @@ export type TrialLog = {
   targetId: string;
   selectedIds: string;
   // Page distribution for multi-page tasks.
-  pagesUsed: string;        // e.g. "1|2"
-  pagesInFolders: string;   // e.g. "1:1-2|2:2"
+  pagesUsed: string; // e.g. "1|2"
+  pagesInFolders: string; // e.g. "1:1-2|2:2"
 };
 
 const PARTICIPANT_KEY = "experiment_participant_id";
@@ -160,15 +158,15 @@ function buildTaskSpec(seed: TaskSeed): TaskSpec {
         ? `1 folder × ${appsPerFolder} apps (across ${pages} pages)`
         : `${folders} folders × ${appsPerFolder} apps each (across ${pages} pages)`
       : folders === 1
-      ? `1 folder × ${appsPerFolder} apps`
-      : `${folders} folders × ${appsPerFolder} apps each`,
+        ? `1 folder × ${appsPerFolder} apps`
+        : `${folders} folders × ${appsPerFolder} apps each`,
     brief: multiPage
       ? folders === 1
         ? `Create 1 folder containing exactly ${appsPerFolder} apps, with at least one app taken from a different page.`
         : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total). At least one folder must contain apps drawn from more than one page.`
       : folders === 1
-      ? `Create 1 folder containing exactly ${appsPerFolder} apps.`
-      : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total).`,
+        ? `Create 1 folder containing exactly ${appsPerFolder} apps.`
+        : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total).`,
     validate: (finalFolders, pageOf) => {
       // Shape check: correct count and sizes.
       const shapeOk =
@@ -196,7 +194,7 @@ function buildTaskSpec(seed: TaskSeed): TaskSpec {
 }
 
 export const TASKS: Record<TaskId, TaskSpec> = Object.fromEntries(
-  EXPERIMENT_TASKS.map((seed) => [seed.id, buildTaskSpec(seed)])
+  EXPERIMENT_TASKS.map((seed) => [seed.id, buildTaskSpec(seed)]),
 ) as Record<TaskId, TaskSpec>;
 
 // ---------------------------------------------------------------------------
@@ -206,7 +204,7 @@ export const TASKS: Record<TaskId, TaskSpec> = Object.fromEntries(
 // generator below then emits one baseline + one lassoTool trial per task.
 // ---------------------------------------------------------------------------
 export const TASKS_PER_CONDITION: TaskId[] = EXPERIMENT_TASKS.map(
-  (seed) => seed.id as TaskId
+  (seed) => seed.id as TaskId,
 );
 
 // ---------------------------------------------------------------------------
@@ -256,7 +254,7 @@ export async function getOrCreateTrialPlan(): Promise<TrialPlanEntry[]> {
             typeof e === "object" &&
             "taskId" in e &&
             typeof (e as TrialPlanEntry).taskId === "string" &&
-            (e as TrialPlanEntry).taskId in TASKS
+            (e as TrialPlanEntry).taskId in TASKS,
         )
       ) {
         return parsed as TrialPlanEntry[];
@@ -296,12 +294,22 @@ export async function isTaskActive(): Promise<boolean> {
   return (await AsyncStorage.getItem(ACTIVE_KEY)) === "1";
 }
 
+// Start timestamp (ms since epoch) of the active trial, or null if none.
+// Used by the on-screen timer; same value completeTask() uses for duration.
+export async function getStartTime(): Promise<number | null> {
+  const [[, start], [, active]] = await AsyncStorage.multiGet([
+    START_KEY,
+    ACTIVE_KEY,
+  ]);
+  return active === "1" && start ? Number(start) : null;
+}
+
 // ---------------------------------------------------------------------------
 // Task status — checks whether the current trial's task is satisfied
 // ---------------------------------------------------------------------------
 export async function isTaskSatisfied(
   folders: FolderGroup[],
-  pageOf: (id: string) => number
+  pageOf: (id: string) => number,
 ): Promise<boolean> {
   const current = await getCurrentTrial();
   if (!current) return false;

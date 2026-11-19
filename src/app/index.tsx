@@ -16,6 +16,7 @@ import {
 } from "react-native-gesture-handler";
 import { runOnJS } from "react-native-reanimated";
 import { Path, Svg } from "react-native-svg";
+import ExperimentTimer from "../components/ExperimentTimer";
 import {
   completeTask,
   getCurrentTrial,
@@ -66,12 +67,30 @@ const PAGE_COUNT = 3;
 // ─────────────────────────────────────────────────────────────
 
 const labels = [
-  "Mail", "Photos", "Music", "Maps",
-  "Camera", "Notes", "Clock", "Weather",
-  "Settings", "Phone", "Wallet", "Messages",
-  "Calendar", "Reminders", "Stocks", "Books",
-  "Podcasts", "Health", "Files", "Bank",
-  "Search", "Socials", "Contacts", "Calculator",
+  "Mail",
+  "Photos",
+  "Music",
+  "Maps",
+  "Camera",
+  "Notes",
+  "Clock",
+  "Weather",
+  "Settings",
+  "Phone",
+  "Wallet",
+  "Messages",
+  "Calendar",
+  "Reminders",
+  "Stocks",
+  "Books",
+  "Podcasts",
+  "Health",
+  "Files",
+  "Bank",
+  "Search",
+  "Socials",
+  "Contacts",
+  "Calculator",
 ];
 
 // ── Grid layout ──────────────────────────────────────────────
@@ -97,30 +116,58 @@ const APPS: AppIcon[] = labels.map((label, i) => {
 //   [x, x, x, x]
 //   [x, x, x, x]
 const CLUSTERED_CELLS: Array<[row: number, col: number]> = [
-  [0, 0], [0, 1], [0, 2], [0, 3],
-  [1, 0], [1, 1], [1, 2], [1, 3],
-  [2, 0], [2, 1], [2, 2], [2, 3],
+  [0, 0],
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [1, 0],
+  [1, 1],
+  [1, 2],
+  [1, 3],
+  [2, 0],
+  [2, 1],
+  [2, 2],
+  [2, 3],
 ];
 
 const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
-  [0, 0], [0, 2],
-  [1, 0], [1, 2], 
-  [2, 1], [2, 3],
-  [3, 0], [3, 1], [3, 3],
-  [4, 1], [4, 2], 
-  [5, 0], [5, 3],
+  [0, 0],
+  [0, 2],
+  [1, 0],
+  [1, 2],
+  [2, 1],
+  [2, 3],
+  [3, 0],
+  [3, 1],
+  [3, 3],
+  [4, 1],
+  [4, 2],
+  [5, 0],
+  [5, 3],
 ];
 const SCATTERED_CELLS_2: Array<[row: number, col: number]> = [
-  [0, 0], [0, 1], [0, 2], [0, 3],
-  [1, 2], [1, 3],
-  [2, 2], [2, 3],
-  [3, 0], [3, 1], [3, 2], [3, 3],
+  [0, 0],
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [1, 2],
+  [1, 3],
+  [2, 2],
+  [2, 3],
+  [3, 0],
+  [3, 1],
+  [3, 2],
+  [3, 3],
 ];
 const SCATTERED_CELLS_3: Array<[row: number, col: number]> = [
-  [0, 0], [0, 1],
-  [1, 0], [1, 1],
-  [2, 2], [2, 3],
-  [3, 2], [3, 3],
+  [0, 0],
+  [0, 1],
+  [1, 0],
+  [1, 1],
+  [2, 2],
+  [2, 3],
+  [3, 2],
+  [3, 3],
 ];
 
 export type LayoutMode =
@@ -163,10 +210,7 @@ function buildScatteredApps(cells: Array<[number, number]>): AppIcon[] {
   });
 }
 
-const APPS_SCATTERED_BY_MODE: Record<
-  Exclude<LayoutMode, "grid">,
-  AppIcon[]
-> = {
+const APPS_SCATTERED_BY_MODE: Record<Exclude<LayoutMode, "grid">, AppIcon[]> = {
   clustered: buildScatteredApps(CLUSTERED_CELLS),
   "scattered-1": buildScatteredApps(SCATTERED_CELLS_1),
   "scattered-2": buildScatteredApps(SCATTERED_CELLS_2),
@@ -191,13 +235,26 @@ const LAYOUT_LABEL: Record<LayoutMode, string> = {
 
 // ── Decoy pages ──────────────────────────────────────────────
 const PAGE_2_LABELS = [
-  "Gym", "Travel", "Shop", "News",
-  "Recipes", "Finance", "Scanner", "Translate",
-  "Paint", "Journal",
+  "Gym",
+  "Travel",
+  "Shop",
+  "News",
+  "Recipes",
+  "Finance",
+  "Scanner",
+  "Translate",
+  "Paint",
+  "Journal",
 ];
 const PAGE_3_LABELS = [
-  "Transport", "Shop", "Delivery", "Food",
-  "Journal", "Movies", "Games", "Compass",
+  "Transport",
+  "Shop",
+  "Delivery",
+  "Food",
+  "Journal",
+  "Movies",
+  "Games",
+  "Compass",
 ];
 
 function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
@@ -260,7 +317,7 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
             easing: Easing.linear,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       );
       animRef.current.start();
     } else {
@@ -287,19 +344,18 @@ function JigglingAppIcon({ app, selected }: JigglingAppIconProps) {
           width: app.size,
           height: app.containerHeight,
           transform: [{ rotate }],
-          
         },
       ]}
     >
       <Image
         source={require("../../assets/LassoToolAssets/app.png")}
-        style={{ 
-          width: app.size, 
-          height: app.size, 
+        style={{
+          width: app.size,
+          height: app.size,
           borderRadius: 14,
           shadowColor: "black",
           shadowOffset: selected
-            ? { width: 0, height: 2}
+            ? { width: 0, height: 2 }
             : { width: 0, height: 0 },
           shadowOpacity: selected ? 0.5 : 0.3,
           shadowRadius: selected ? 2 : 1,
@@ -400,7 +456,7 @@ export default function Index() {
         if (app.page !== 1) return app;
         const pos = posById.get(app.id);
         return pos ? { ...app, x: pos.x, y: pos.y } : app;
-      })
+      }),
     );
 
     if (next !== "grid") {
@@ -413,7 +469,7 @@ export default function Index() {
 
       setSelectedIds((prev) => {
         const hiddenSet = new Set(
-          apps.filter((a) => hidden(a)).map((a) => a.id)
+          apps.filter((a) => hidden(a)).map((a) => a.id),
         );
         return prev.filter((id) => !hiddenSet.has(id));
       });
@@ -425,27 +481,27 @@ export default function Index() {
             f.appIds.every((id) => {
               const targetApp = apps.find((a) => a.id === id);
               return targetApp ? !hidden(targetApp) : true;
-            })
-        )
+            }),
+        ),
       );
       setApps((prev) =>
-        prev.map((app) =>
-          hidden(app) ? { ...app, groupId: undefined } : app
-        )
+        prev.map((app) => (hidden(app) ? { ...app, groupId: undefined } : app)),
       );
     }
   };
 
   const cycleLayout = () => {
     const next =
-      LAYOUT_CYCLE[(LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length];
+      LAYOUT_CYCLE[
+        (LAYOUT_CYCLE.indexOf(layoutMode) + 1) % LAYOUT_CYCLE.length
+      ];
     applyLayout(next);
   };
 
   // Auto-set the layout for the current trial's condition:
   //   clustered conditions (A, C) → "clustered"
   //   scattered conditions (B, D) → "scattered-1"
-    useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       const trial = await getCurrentTrial();
@@ -491,7 +547,7 @@ export default function Index() {
     setCurrentPath(nextPath);
   };
 
-    const finishLasso = () => {
+  const finishLasso = () => {
     const polygon = pathRef.current;
     pathRef.current = [];
     setCurrentPath([]);
@@ -506,8 +562,8 @@ export default function Index() {
       .filter((app) =>
         pointInPolygon(
           { x: app.x + app.size / 2, y: app.y + app.size / 2 },
-          polygon
-        )
+          polygon,
+        ),
       )
       .map((app) => app.id);
 
@@ -577,8 +633,8 @@ export default function Index() {
 
     setApps((previous) =>
       previous.map((app) =>
-        selectedIds.includes(app.id) ? { ...app, groupId } : app
-      )
+        selectedIds.includes(app.id) ? { ...app, groupId } : app,
+      ),
     );
 
     // Folder is placed on the page of the first selected app. Its appIds
@@ -625,7 +681,7 @@ export default function Index() {
 
   const ungroupSelectedApps = () => {
     setApps((previous) =>
-      previous.map((app) => ({ ...app, groupId: undefined }))
+      previous.map((app) => ({ ...app, groupId: undefined })),
     );
     setSelectedIds([]);
     setFolders([]);
@@ -662,6 +718,8 @@ export default function Index() {
           contentFit="cover"
         />
 
+        <ExperimentTimer />
+
         <View style={styles.pageContainer}>
           {visibleApps.map((app) => (
             <JigglingAppIcon
@@ -680,10 +738,8 @@ export default function Index() {
             onOpen={() =>
               setFolders((previous) =>
                 previous.map((item) =>
-                  item.id === folder.id
-                    ? { ...item, open: !item.open }
-                    : item
-                )
+                  item.id === folder.id ? { ...item, open: !item.open } : item,
+                ),
               )
             }
           />
