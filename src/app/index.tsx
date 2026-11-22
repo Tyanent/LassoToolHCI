@@ -25,7 +25,7 @@ import {
   pageStyleForTask,
 } from "../lib/experimentSession";
 // SVG container dimensions
-const height = 900;
+const height = 890;
 const width = 400;
 
 type Point = { x: number; y: number };
@@ -109,65 +109,35 @@ const APPS: AppIcon[] = labels.map((label, i) => {
 });
 
 // ── Clustered & scattered layouts for page 1 ─────────────────
-// Clustered: 12 apps in 3 full rows of 4 (rows 3-5 stay empty).
-//   [A, A, A, A]
-//   [A, A, A, A]
-//   [A, A, A, A]
-//   [x, x, x, x]
-//   [x, x, x, x]
 const CLUSTERED_CELLS: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 1],
-  [0, 2],
-  [0, 3],
-  [1, 0],
-  [1, 1],
-  [1, 2],
-  [1, 3],
-  [2, 0],
-  [2, 1],
-  [2, 2],
-  [2, 3],
+  [0, 0], [0, 1], [0, 2], [0, 3],
+  [1, 0], [1, 1], [1, 2], [1, 3],
+  [2, 0], [2, 1], [2, 2], [2, 3],
 ];
 
 const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 2],
-  [1, 0],
-  [1, 2],
-  [2, 1],
-  [2, 3],
-  [3, 0],
-  [3, 1],
-  [3, 3],
-  [4, 1],
-  [4, 2],
-  [5, 0],
-  [5, 3],
+  [0, 0], [0, 2],
+  [1, 0], [1, 2],
+  [2, 1], [2, 3],
+  [3, 0], [3, 1], [3, 3],
+  [4, 1], [4, 2],
+  [5, 0], [5, 3],
 ];
 const SCATTERED_CELLS_2: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 1],
-  [0, 2],
-  [0, 3],
-  [1, 2],
-  [1, 3],
-  [2, 2],
-  [2, 3],
-  [3, 0],
-  [3, 1],
-  [3, 2],
-  [3, 3],
+  [0, 0], [0, 2], [0, 3],
+  [1, 2], [1, 3],
+  [2, 2], [2, 3],
+  [3, 0], [3, 1],
+  [4, 1], [4, 3],
+  [5, 2],
 ];
 const SCATTERED_CELLS_3: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 1],
+  [0, 0], [0, 1],
   [1, 0],
-  [1, 1],
-  [2, 2],
-  [2, 3],
-  [3, 2],
-  [3, 3],
+  [2, 2], [2, 3],
+  [3, 0], [3, 1], [3, 3],
+  [4, 1], [4, 2],
+  [5, 0], [5, 3],
 ];
 
 export type LayoutMode =
@@ -234,6 +204,7 @@ const LAYOUT_LABEL: Record<LayoutMode, string> = {
 };
 
 // ── Decoy pages ──────────────────────────────────────────────
+
 const PAGE_2_LABELS = [
   "Gym",
   "Travel",
@@ -243,18 +214,24 @@ const PAGE_2_LABELS = [
   "Finance",
   "Scanner",
   "Translate",
-  "Paint",
-  "Journal",
+  "Calendar",
+  "Stocks", 
+  "Files",
+  "Contacts",
 ];
 const PAGE_3_LABELS = [
-  "Transport",
-  "Shop",
-  "Delivery",
-  "Food",
-  "Journal",
-  "Movies",
-  "Games",
-  "Compass",
+  "Podcast",
+  "Health",
+  "Files",
+  "Bank",
+  "Notes",
+  "Books",
+  "Stocks",
+  "Reminders",
+  "Game",
+  "Settings",
+  "e-Health", 
+  "Social"
 ];
 
 function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
@@ -273,8 +250,131 @@ function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
   });
 }
 
+function buildDecoyScatteredPage(
+  pageLabels: string[],
+  cells: Array<[number, number]>,
+  pageIndex: number,
+): AppIcon[] {
+  return pageLabels.slice(0, cells.length).map((label, i) => {
+    const [row, col] = cells[i];
+    return {
+      id: `p${pageIndex}-${i + 1}`,
+      label,
+      x: startX + col * Xspacing,
+      y: startY + row * Yspacing,
+      size: iconSize,
+      containerHeight: iconSize + LabelHeight,
+      page: pageIndex,
+    };
+  });
+}
+
 const APPS_PAGE_2 = buildDecoyPage(PAGE_2_LABELS, 2);
 const APPS_PAGE_3 = buildDecoyPage(PAGE_3_LABELS, 3);
+
+// Scattered variants for decoy pages. Page 2 uses SCATTERED_CELLS_2 and
+// page 3 uses SCATTERED_CELLS_3.
+const APPS_PAGE_2_SCATTERED = buildDecoyScatteredPage(
+  PAGE_2_LABELS,
+  SCATTERED_CELLS_2,
+  2,
+);
+const APPS_PAGE_3_SCATTERED = buildDecoyScatteredPage(
+  PAGE_3_LABELS,
+  SCATTERED_CELLS_3,
+  3,
+);
+
+// Clustered variants for decoy pages — reuse CLUSTERED_CELLS so all pages
+// share the same 12-cell clustered look.
+const APPS_PAGE_2_CLUSTERED = buildDecoyScatteredPage(
+  PAGE_2_LABELS,
+  CLUSTERED_CELLS,
+  2,
+);
+const APPS_PAGE_3_CLUSTERED = buildDecoyScatteredPage(
+  PAGE_3_LABELS,
+  CLUSTERED_CELLS,
+  3,
+);
+
+// "grid" leaves every page alone. Everything else (clustered + scattered-*)
+// rearranges pages 1–3, but with different cell sets per mode/page.
+function rearrangesPages(mode: LayoutMode): boolean {
+  return mode !== "grid";
+}
+
+// Cells that apply to a given page under a given layout, or undefined if the
+// layout doesn't rearrange that page.
+function layoutCellsForPage(
+  pageNumber: number,
+  mode: LayoutMode,
+): Array<[number, number]> | undefined {
+  if (!rearrangesPages(mode)) return undefined;
+
+  if (mode === "clustered") {
+    // Clustered uses the same cell set for every page.
+    return CLUSTERED_CELLS;
+  }
+
+  // Scattered modes: page 1 follows the mode, pages 2/3 use 2 and 3.
+  if (pageNumber === 1) return SCATTERED_CELLS_BY_MODE[mode];
+  if (pageNumber === 2) return SCATTERED_CELLS_2;
+  if (pageNumber === 3) return SCATTERED_CELLS_3;
+  return undefined;
+}
+
+// Prebuilt positions per page under a given layout, or undefined when the
+// layout leaves that page's positions untouched (grid).
+function positionsForPage(
+  pageNumber: number,
+  mode: LayoutMode,
+): AppIcon[] | undefined {
+  if (!rearrangesPages(mode)) return undefined;
+
+  if (mode === "clustered") {
+    if (pageNumber === 1) return APPS_SCATTERED_BY_MODE.clustered;
+    if (pageNumber === 2) return APPS_PAGE_2_CLUSTERED;
+    if (pageNumber === 3) return APPS_PAGE_3_CLUSTERED;
+    return undefined;
+  }
+
+  // Scattered modes.
+  if (pageNumber === 1) return APPS_SCATTERED_BY_MODE[mode];
+  if (pageNumber === 2) return APPS_PAGE_2_SCATTERED;
+  if (pageNumber === 3) return APPS_PAGE_3_SCATTERED;
+  return undefined;
+}
+
+// True when an app is hidden by the active layout's cell count on its page.
+// "grid" hides nothing. Clustered and scattered modes hide extras.
+function isHiddenByLayout(
+  app: AppIcon,
+  currentPage: number,
+  mode: LayoutMode,
+): boolean {
+  if (app.page !== currentPage) return false;
+  if (!rearrangesPages(mode)) return false;
+
+  const cells = layoutCellsForPage(currentPage, mode);
+  if (!cells) return false;
+
+  // Page-1 apps: numbered ids only.
+  if (currentPage === 1) {
+    const n = Number(app.id);
+    if (Number.isNaN(n)) return false;
+    return n > cells.length;
+  }
+
+  // Page-2/3 decoy apps: ids are `p{page}-{n}`.
+  if (currentPage === 2 || currentPage === 3) {
+    const match = /^p\d+-(\d+)$/.exec(app.id);
+    if (!match) return false;
+    return Number(match[1]) > cells.length;
+  }
+
+  return false;
+}
 // ─────────────────────────────────────────────────────────────
 
 function pointInPolygon(point: Point, polygon: Point[]): boolean {
@@ -440,52 +540,43 @@ export default function Index() {
   const groupIdCounter = useRef(0);
 
   // ── Layout mode ──────────────────────────────────────────
-  // Default to grid; the mount effect below auto-switches to `clustered`
-  // for clustered conditions (A, C) and to `scattered-1` for scattered
-  // conditions (B, D).
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
 
   const applyLayout = (next: LayoutMode) => {
     setLayoutMode(next);
 
-    const positions = appsForMode(next);
-    const posById = new Map(positions.map((a) => [a.id, a]));
-
+    // Remap positions for whichever pages the new layout affects.
     setApps((prev) =>
       prev.map((app) => {
-        if (app.page !== 1) return app;
-        const pos = posById.get(app.id);
+        const positions = positionsForPage(app.page, next);
+        if (!positions) return app;
+        const pos = positions.find((p) => p.id === app.id);
         return pos ? { ...app, x: pos.x, y: pos.y } : app;
       }),
     );
 
-    if (next !== "grid") {
-      const limit = SCATTERED_CELLS_BY_MODE[next].length;
-      const hidden = (app: AppIcon) => {
-        if (app.page !== 1) return false;
-        const n = Number(app.id);
-        return !Number.isNaN(n) && n > limit;
-      };
+    // Only grid leaves everything untouched; every other layout can hide
+    // apps that fall outside its cell count.
+    if (rearrangesPages(next)) {
+      const isHidden = (app: AppIcon) => isHiddenByLayout(app, app.page, next);
 
       setSelectedIds((prev) => {
         const hiddenSet = new Set(
-          apps.filter((a) => hidden(a)).map((a) => a.id),
+          apps.filter((a) => isHidden(a)).map((a) => a.id),
         );
         return prev.filter((id) => !hiddenSet.has(id));
       });
 
       setFolders((prev) =>
-        prev.filter(
-          (f) =>
-            f.page !== 1 ||
-            f.appIds.every((id) => {
-              const targetApp = apps.find((a) => a.id === id);
-              return targetApp ? !hidden(targetApp) : true;
-            }),
+        prev.filter((f) =>
+          f.appIds.every((id) => {
+            const targetApp = apps.find((a) => a.id === id);
+            return targetApp ? !isHidden(targetApp) : true;
+          }),
         ),
       );
       setApps((prev) =>
-        prev.map((app) => (hidden(app) ? { ...app, groupId: undefined } : app)),
+        prev.map((app) => (isHidden(app) ? { ...app, groupId: undefined } : app)),
       );
     }
   };
@@ -498,9 +589,7 @@ export default function Index() {
     applyLayout(next);
   };
 
-  // Auto-set the layout for the current trial's condition:
-  //   clustered conditions (A, C) → "clustered"
-  //   scattered conditions (B, D) → "scattered-1"
+  // Auto-set the layout for the current trial's condition.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -693,17 +782,9 @@ export default function Index() {
     if (a.groupId) return false;
     if (a.page !== page + 1) return false;
 
-    if (page === 0) {
-      const limit = scatteredAppCountFor(layoutMode);
-      if (limit !== undefined) {
-        const n = Number(a.id);
-        // Only hide the numbered page-1 apps that fall outside the layout's
-        // visible-cell count. Decoy apps (ids like "p2-3") have NaN id and
-        // must NOT be hidden — hiding them breaks lasso selection on page 1
-        // for any decoy that ends up here.
-        if (!Number.isNaN(n) && n > limit) return false;
-      }
-    }
+    // Hide apps that fall outside the active layout's cell count on this page.
+    if (isHiddenByLayout(a, page + 1, layoutMode)) return false;
+
     return true;
   });
 
@@ -747,7 +828,7 @@ export default function Index() {
 
         <GestureDetector gesture={drag}>
           <View style={styles.svgContainer}>
-            <Svg height={height * 0.7} width={width} pointerEvents="none">
+            <Svg pointerEvents="none">
               {currentPath.length > 1 && (
                 <Path
                   d={toSvgPath(currentPath)}
@@ -815,6 +896,7 @@ export default function Index() {
           </TouchableOpacity>
         </View>
 
+        {/*Dev Toggle Buttons for Layout and Pager REMOVE LATER*/}
         <View style={styles.toggleRow}>
           <TouchableOpacity style={styles.toggleButton} onPress={cycleLayout}>
             <Text style={styles.toggleText}>
@@ -844,7 +926,7 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center" },
+  container: { flex: 1 },
   pageContainer: {
     position: "absolute",
     top: 0,
@@ -853,12 +935,16 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   svgContainer: {
-    height: height * 0.7,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: "transparent",
   },
   pagerBar: {
     position: "absolute",
-    bottom: 120,
+    bottom: 70,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -888,19 +974,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.4)",
   },
   dotActive: { backgroundColor: "white" },
+
   buttonRow: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginTop: 0,
   },
   button: {
-    marginTop: 5,
     backgroundColor: "black",
     opacity: 0.5,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 100,
     alignItems: "center",
     justifyContent: "center",
@@ -913,14 +1003,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   toggleRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
+    flexDirection: "column",
+    gap: 5,
     marginTop: 12,
-    paddingHorizontal: 20,
+    marginLeft: 10,
+    width: "40%",
   },
   toggleButton: {
     backgroundColor: "#333",
+    opacity: 0.7,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 100,

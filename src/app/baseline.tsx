@@ -22,7 +22,7 @@ import {
   pageStyleForTask,
 } from "../lib/experimentSession";
 // ---------- Layout ----------
-const height = 900;
+const height = 890;
 const width = 380;
 const startX = 25;
 const startY = 15;
@@ -103,57 +103,34 @@ const APPS: AppIcon[] = labels.map((label, i) => {
 
 // ---------- Clustered & scattered layouts (page 1) ----------
 const CLUSTERED_CELLS: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 1],
-  [0, 2],
-  [0, 3],
-  [1, 0],
-  [1, 1],
-  [1, 2],
-  [1, 3],
-  [2, 0],
-  [2, 1],
-  [2, 2],
-  [2, 3],
+  [0, 0], [0, 1], [0, 2], [0, 3],
+  [1, 0], [1, 1], [1, 2], [1, 3],
+  [2, 0], [2, 1], [2, 2], [2, 3],
 ];
 
 const SCATTERED_CELLS_1: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 2],
-  [1, 0],
-  [1, 2],
-  [2, 1],
-  [2, 3],
-  [3, 0],
-  [3, 1],
-  [3, 3],
-  [4, 1],
-  [4, 2],
-  [5, 0],
-  [5, 3],
+  [0, 0], [0, 2],
+  [1, 0], [1, 2],
+  [2, 1], [2, 3],
+  [3, 0], [3, 1], [3, 3],
+  [4, 1], [4, 2],
+  [5, 0], [5, 3],
 ];
 const SCATTERED_CELLS_2: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 1],
-  [0, 2],
-  [0, 3],
-  [1, 1],
-  [1, 2],
-  [2, 1],
-  [2, 2],
-  [2, 3],
-  [3, 2],
-  [3, 3],
+  [0, 0], [0, 2], [0, 3],
+  [1, 2], [1, 3],
+  [2, 2], [2, 3],
+  [3, 0], [3, 1], 
+  [4, 1], [4, 3],
+  [5, 2]
 ];
 const SCATTERED_CELLS_3: Array<[row: number, col: number]> = [
-  [0, 0],
-  [0, 1],
-  [1, 0],
-  [1, 1],
-  [2, 2],
-  [2, 3],
-  [3, 2],
-  [3, 3],
+  [0, 0], [0, 1],
+  [1, 0], 
+  [2, 2], [2, 3],
+  [3, 0], [3, 1], [3, 3],
+  [4, 1], [4, 2],
+  [5, 0], [5, 3],
 ];
 
 export type LayoutMode =
@@ -172,9 +149,10 @@ const LAYOUT_CYCLE: LayoutMode[] = [
 ];
 
 const SCATTERED_CELLS_BY_MODE: Record<
-  Exclude<LayoutMode, "grid">,
+  LayoutMode,
   Array<[number, number]>
 > = {
+  grid: [],         
   clustered: CLUSTERED_CELLS,
   "scattered-1": SCATTERED_CELLS_1,
   "scattered-2": SCATTERED_CELLS_2,
@@ -196,7 +174,11 @@ function buildScatteredApps(cells: Array<[number, number]>): AppIcon[] {
   });
 }
 
-const APPS_SCATTERED_BY_MODE: Record<Exclude<LayoutMode, "grid">, AppIcon[]> = {
+const APPS_SCATTERED_BY_MODE: Record<
+  LayoutMode,
+  AppIcon[]
+> = {
+  grid: [],        
   clustered: buildScatteredApps(CLUSTERED_CELLS),
   "scattered-1": buildScatteredApps(SCATTERED_CELLS_1),
   "scattered-2": buildScatteredApps(SCATTERED_CELLS_2),
@@ -231,16 +213,24 @@ const PAGE_2_LABELS = [
   "Finance",
   "Scanner",
   "Translate",
+  "Calendar",
+  "Stocks", 
+  "Files",
+  "Contacts",
 ];
 const PAGE_3_LABELS = [
-  "Podcasts 2",
-  "Health 2",
-  "Files 2",
-  "Bank 2",
-  "Notes 2",
-  "Books 2",
-  "Stocks 2",
-  "Reminders 2",
+  "Podcast",
+  "Health",
+  "Files",
+  "Bank",
+  "Notes",
+  "Books",
+  "Stocks",
+  "Reminders",
+  "Game",
+  "Settings",
+  "e-Health", 
+  "Social"
 ];
 
 function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
@@ -259,25 +249,132 @@ function buildDecoyPage(labels: string[], pageIndex: number): AppIcon[] {
   });
 }
 
+function buildDecoyScatteredPage(
+  pageLabels: string[],
+  cells: Array<[number, number]>,
+  pageIndex: number,
+): AppIcon[] {
+  return pageLabels.slice(0, cells.length).map((label, i) => {
+    const [row, col] = cells[i];
+    return {
+      id: `p${pageIndex}-${i + 1}`,
+      label,
+      x: startX + col * Xspacing,
+      y: startY + row * Yspacing,
+      size: iconSize,
+      containerHeight,
+      page: pageIndex,
+    };
+  });
+}
+
 const APPS_PAGE_2 = buildDecoyPage(PAGE_2_LABELS, 2);
 const APPS_PAGE_3 = buildDecoyPage(PAGE_3_LABELS, 3);
 
+// Scattered variants for decoy pages. Page 2 uses SCATTERED_CELLS_2 and
+// page 3 uses SCATTERED_CELLS_3.
+const APPS_PAGE_2_SCATTERED = buildDecoyScatteredPage(
+  PAGE_2_LABELS,
+  SCATTERED_CELLS_2,
+  2,
+);
+const APPS_PAGE_3_SCATTERED = buildDecoyScatteredPage(
+  PAGE_3_LABELS,
+  SCATTERED_CELLS_3,
+  3,
+);
+
+// Clustered variants for decoy pages. Clustered has only one cell set
+// (CLUSTERED_CELLS), so pages 2 and 3 reuse it — matching page 1's clustered
+// look. Twelve cells fit twelve labels exactly, so nothing gets hidden.
+const APPS_PAGE_2_CLUSTERED = buildDecoyScatteredPage(
+  PAGE_2_LABELS,
+  CLUSTERED_CELLS,
+  2,
+);
+const APPS_PAGE_3_CLUSTERED = buildDecoyScatteredPage(
+  PAGE_3_LABELS,
+  CLUSTERED_CELLS,
+  3,
+);
+
+// "grid" leaves every page alone. Everything else (clustered + scattered-*)
+// rearranges pages 1–3, but with different cell sets per mode/page.
+function rearrangesPages(mode: LayoutMode): boolean {
+  return mode !== "grid";
+}
+
+// Cells that apply to a given page under a given layout, or undefined if the
+// layout doesn't rearrange that page.
+function layoutCellsForPage(
+  pageNumber: number,
+  mode: LayoutMode,
+): Array<[number, number]> | undefined {
+  if (!rearrangesPages(mode)) return undefined;
+
+  if (mode === "clustered") {
+    // Clustered uses the same cell set for every page.
+    return CLUSTERED_CELLS;
+  }
+
+  // Scattered modes: page 1 follows the mode, pages 2/3 use 2 and 3.
+  if (pageNumber === 1) return SCATTERED_CELLS_BY_MODE[mode];
+  if (pageNumber === 2) return SCATTERED_CELLS_2;
+  if (pageNumber === 3) return SCATTERED_CELLS_3;
+  return undefined;
+}
+
+// Prebuilt positions per page under a given layout, or undefined when the
+// layout leaves that page's positions untouched (grid).
+function positionsForPage(
+  pageNumber: number,
+  mode: LayoutMode,
+): AppIcon[] | undefined {
+  if (!rearrangesPages(mode)) return undefined;
+
+  if (mode === "clustered") {
+    if (pageNumber === 1) return APPS_SCATTERED_BY_MODE.clustered;
+    if (pageNumber === 2) return APPS_PAGE_2_CLUSTERED;
+    if (pageNumber === 3) return APPS_PAGE_3_CLUSTERED;
+    return undefined;
+  }
+
+  // Scattered modes.
+  if (pageNumber === 1) return APPS_SCATTERED_BY_MODE[mode];
+  if (pageNumber === 2) return APPS_PAGE_2_SCATTERED;
+  if (pageNumber === 3) return APPS_PAGE_3_SCATTERED;
+  return undefined;
+}
+
 // ---------- Layout visibility helper ----------
-// True when an app is on the current page but hidden by the active layout's
-// cell count. Only numbered page-1 apps can be hidden this way; decoy apps
-// (ids like "p2-3") have NaN id and are never layout-hidden.
+// True when an app is hidden by the active layout's cell count on its page.
+// "grid" hides nothing. Clustered and scattered modes hide extras.
 function isHiddenByLayout(
   app: AppIcon,
   currentPage: number,
   mode: LayoutMode,
 ): boolean {
   if (app.page !== currentPage) return false;
-  if (currentPage !== 1) return false;
-  const limit = scatteredAppCountFor(mode);
-  if (limit === undefined) return false;
-  const n = Number(app.id);
-  if (Number.isNaN(n)) return false;
-  return n > limit;
+  if (!rearrangesPages(mode)) return false;
+
+  const cells = layoutCellsForPage(currentPage, mode);
+  if (!cells) return false;
+
+  // Page-1 apps: numbered ids only.
+  if (currentPage === 1) {
+    const n = Number(app.id);
+    if (Number.isNaN(n)) return false;
+    return n > cells.length;
+  }
+
+  // Page-2/3 decoy apps: ids are `p{page}-{n}`.
+  if (currentPage === 2 || currentPage === 3) {
+    const match = /^p\d+-(\d+)$/.exec(app.id);
+    if (!match) return false;
+    return Number(match[1]) > cells.length;
+  }
+
+  return false;
 }
 
 // ---------- Helpers ----------
@@ -446,37 +543,31 @@ export default function Index() {
   const applyLayout = (next: LayoutMode) => {
     setLayoutMode(next);
 
-    const positions = appsForMode(next);
-    const posById = new Map(positions.map((a) => [a.id, a]));
-
+    // Remap positions for whichever pages the new layout affects.
     setApps((prev) =>
       prev.map((app) => {
-        if (app.page !== 1) return app;
-        const pos = posById.get(app.id);
+        const positions = positionsForPage(app.page, next);
+        if (!positions) return app;
+        const pos = positions.find((p) => p.id === app.id);
         return pos ? { ...app, x: pos.x, y: pos.y } : app;
       }),
     );
 
-    if (next !== "grid") {
-      const limit = SCATTERED_CELLS_BY_MODE[next].length;
-      const hidden = (app: AppIcon) => {
-        if (app.page !== 1) return false;
-        const n = Number(app.id);
-        return !Number.isNaN(n) && n > limit;
-      };
+    // Only grid leaves everything untouched; every other layout can hide
+    // apps that fall outside its cell count.
+    if (rearrangesPages(next)) {
+      const isHidden = (app: AppIcon) => isHiddenByLayout(app, app.page, next);
 
       setFolders((prev) =>
-        prev.filter(
-          (f) =>
-            f.page !== 1 ||
-            f.appIds.every((id) => {
-              const targetApp = apps.find((a) => a.id === id);
-              return targetApp ? !hidden(targetApp) : true;
-            }),
+        prev.filter((f) =>
+          f.appIds.every((id) => {
+            const targetApp = apps.find((a) => a.id === id);
+            return targetApp ? !isHidden(targetApp) : true;
+          }),
         ),
       );
       setApps((prev) =>
-        prev.map((app) => (hidden(app) ? { ...app, groupId: undefined } : app)),
+        prev.map((app) => (isHidden(app) ? { ...app, groupId: undefined } : app)),
       );
     }
   };
@@ -858,7 +949,7 @@ export default function Index() {
           <ExperimentTimer />
 
           <View style={styles.chipColumn} pointerEvents="box-none">
-            {SHOW_LAYOUT_TOGGLE && page === 0 && (
+            {SHOW_LAYOUT_TOGGLE && page === 0 && (//Toggle Dev Buttons **REMOVE LATER
               <TouchableOpacity
                 style={styles.layoutToggle}
                 onPress={cycleLayout}
@@ -1075,7 +1166,7 @@ const styles = StyleSheet.create({
   },
   pagerBar: {
     position: "absolute",
-    bottom: 120,
+    bottom: 70,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -1099,7 +1190,7 @@ const styles = StyleSheet.create({
   dotActive: { backgroundColor: "white" },
   resetRow: {
     position: "absolute",
-    bottom: 40,
+    bottom: 10,
     alignSelf: "center",
     zIndex: 10,
   },
