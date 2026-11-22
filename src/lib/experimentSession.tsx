@@ -6,52 +6,52 @@ export type Outcome = "success" | "failure";
 // ---------------------------------------------------------------------------
 // Experimental design
 // ---------------------------------------------------------------------------
-// 2×2 factorial design, each cell contributes 2 trials (1 baseline + 1 lasso):
-//
-//                    Clustered          Scattered
-//   Single Page      Condition A        Condition B
-//   Multi Page       Condition C        Condition D
-//
-// Total trials per participant = sum of TASKS_PER_CONDITION × 2.
+// Two blocks of 12 trials each (24 trials total):
+//   Block 1 (Single Page · 12 trials, 3 per condition):
+//     1) Lasso Gesture + Clustered Layout
+//     2) Lasso Gesture + Scattered Layout
+//     3) Drag and Drop (Baseline) + Clustered Layout
+//     4) Drag and Drop (Baseline) + Scattered Layout
+//   Block 2 (Multi Page · 12 trials):
+//     Multi-page tasks (Clustered & Scattered across multiple pages)
 // ---------------------------------------------------------------------------
 export type LayoutStyle = "clustered" | "scattered";
 export type PageStyle = "single" | "multi";
 export type ExperimentCondition = "A" | "B" | "C" | "D";
+export type ExperimentBlock = 1 | 2;
 
 export const CONDITION_MATRIX: Record<
   ExperimentCondition,
-  { layout: LayoutStyle; pages: PageStyle; label: string }
+  { layout: LayoutStyle; pages: PageStyle; block: ExperimentBlock; label: string }
 > = {
   A: {
     layout: "clustered",
     pages: "single",
+    block: 1,
     label: "Clustered · Single Page",
   },
   B: {
     layout: "scattered",
     pages: "single",
+    block: 1,
     label: "Scattered · Single Page",
   },
   C: {
     layout: "clustered",
     pages: "multi",
+    block: 2,
     label: "Clustered · Multi Page",
   },
   D: {
     layout: "scattered",
     pages: "multi",
+    block: 2,
     label: "Scattered · Multi Page",
   },
 };
 
 // ---------------------------------------------------------------------------
 // ─── THE ONLY INPUT ────────────────────────────────────────────────────────
-// ---------------------------------------------------------------------------
-// Add / edit / remove tasks here. Every other derived type and table below
-// (TaskId, TaskShape, TaskSpec, TASKS, TASKS_PER_CONDITION, labels, briefs,
-// validators, CSV) is generated from this array. To add a task, just append
-// one entry. To add a condition, add a letter to CONDITION_MATRIX above and
-// use it as the `condition` here.
 // ---------------------------------------------------------------------------
 type TaskSeed = {
   id: string;
@@ -63,21 +63,25 @@ type TaskSeed = {
 
 const EXPERIMENT_TASKS = [
   //Add New Tasks Here
-  // ── Condition A — clustered · single page ─────────────────
+  // ── Block 1: Condition A — clustered · single page ─────────
   { id: "A-3x3", condition: "A", folders: 3, appsPerFolder: 3, pages: 1 },
   { id: "A-1x8", condition: "A", folders: 1, appsPerFolder: 8, pages: 1 },
+  { id: "A-2x4", condition: "A", folders: 2, appsPerFolder: 4, pages: 1 },
 
-  // ── Condition B — scattered · single page ─────────────────
+  // ── Block 1: Condition B — scattered · single page ─────────
   { id: "B-3x3", condition: "B", folders: 3, appsPerFolder: 3, pages: 1 },
   { id: "B-1x8", condition: "B", folders: 1, appsPerFolder: 8, pages: 1 },
+  { id: "B-2x4", condition: "B", folders: 2, appsPerFolder: 4, pages: 1 },
 
-  // ── Condition C — clustered · multi page ──────────────────
+  // ── Block 2: Condition C — clustered · multi page ──────────
   { id: "C-1x4-cross", condition: "C", folders: 1, appsPerFolder: 4, pages: 2 },
   { id: "C-2x3-cross", condition: "C", folders: 2, appsPerFolder: 3, pages: 2 },
+  { id: "C-1x3-cross3", condition: "C", folders: 1, appsPerFolder: 3, pages: 3 },
 
-  // ── Condition D — scattered · multi page ──────────────────
+  // ── Block 2: Condition D — scattered · multi page ──────────
   { id: "D-1x4-cross", condition: "D", folders: 1, appsPerFolder: 4, pages: 2 },
   { id: "D-2x3-cross", condition: "D", folders: 2, appsPerFolder: 3, pages: 2 },
+  { id: "D-1x3-cross3", condition: "D", folders: 1, appsPerFolder: 3, pages: 3 },
 ] as const satisfies readonly TaskSeed[];
 
 // Derive the literal TaskId union from EXPERIMENT_TASKS.
@@ -95,6 +99,12 @@ export function pageStyleForTask(taskId: TaskId): PageStyle {
   return CONDITION_MATRIX[letter]?.pages ?? "single";
 }
 
+// Map a task id to its experiment block (1 = Single Page, 2 = Multi Page).
+export function blockForTask(taskId: TaskId): ExperimentBlock {
+  const letter = taskId.charAt(0) as ExperimentCondition;
+  return CONDITION_MATRIX[letter]?.block ?? 1;
+}
+
 // ---------------------------------------------------------------------------
 // Task config
 // ---------------------------------------------------------------------------
@@ -107,12 +117,14 @@ export type TaskShape = {
 export type FolderGroup = { appIds: string[] };
 
 export type TrialPlanEntry = {
+  block: ExperimentBlock;
   condition: Condition;
   taskId: TaskId;
 };
 
 export type TaskSpec = TaskShape & {
   id: TaskId;
+  block: ExperimentBlock;
   label: string;
   brief: string;
   validate: (folders: FolderGroup[], pageOf: (id: string) => number) => boolean;
@@ -120,6 +132,7 @@ export type TaskSpec = TaskShape & {
 
 export type TrialLog = {
   participantId: string;
+  block: ExperimentBlock;
   condition: Condition;
   taskId: TaskId;
   trialNumber: number;
@@ -144,12 +157,14 @@ const ACTIVE_KEY = "experiment_task_active";
 // Task registry (built from EXPERIMENT_TASKS)
 // ---------------------------------------------------------------------------
 function buildTaskSpec(seed: TaskSeed): TaskSpec {
-  const { id, folders, appsPerFolder, pages } = seed;
+  const { id, condition, folders, appsPerFolder, pages } = seed;
+  const block = CONDITION_MATRIX[condition]?.block ?? (pages > 1 ? 2 : 1);
   const total = folders * appsPerFolder;
   const multiPage = pages > 1;
 
   return {
     id: id as TaskId,
+    block,
     folders,
     appsPerFolder,
     pages,
@@ -200,9 +215,6 @@ export const TASKS: Record<TaskId, TaskSpec> = Object.fromEntries(
 // ---------------------------------------------------------------------------
 // Trial plan configuration (derived from EXPERIMENT_TASKS)
 // ---------------------------------------------------------------------------
-// One entry per task, in the order they appear in EXPERIMENT_TASKS. The plan
-// generator below then emits one baseline + one lassoTool trial per task.
-// ---------------------------------------------------------------------------
 export const TASKS_PER_CONDITION: TaskId[] = EXPERIMENT_TASKS.map(
   (seed) => seed.id as TaskId,
 );
@@ -221,21 +233,51 @@ export async function getOrCreateParticipantId(): Promise<string> {
 // ---------------------------------------------------------------------------
 // Trial plan
 // ---------------------------------------------------------------------------
-async function generateTrialPlan(): Promise<TrialPlanEntry[]> {
-  // For each task in TASKS_PER_CONDITION, emit one baseline and one lasso
-  // trial, then shuffle the whole list. This guarantees each condition runs
-  // exactly once under baseline and once under lassoTool.
-  const plan: TrialPlanEntry[] = [];
-  for (const taskId of TASKS_PER_CONDITION) {
-    plan.push({ condition: "baseline", taskId });
-    plan.push({ condition: "lassoTool", taskId });
-  }
-  // Fisher-Yates shuffle
-  for (let i = plan.length - 1; i > 0; i--) {
+function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [plan[i], plan[j]] = [plan[j], plan[i]];
+    [items[i], items[j]] = [items[j], items[i]];
   }
-  return plan;
+  return items;
+}
+
+async function generateTrialPlan(): Promise<TrialPlanEntry[]> {
+  // Block 1 (Single Page · 12 trials):
+  //   - Condition A (Clustered, Single Page): 3 trials (1 baseline, 2 lassoTool / or paired)
+  //   - Condition B (Scattered, Single Page): 3 trials
+  // To guarantee exact 3 trials per single-page condition and 12 trials per block:
+  const block1: TrialPlanEntry[] = [
+    // Lasso + Clustered (3 trials)
+    { block: 1, condition: "lassoTool", taskId: "A-3x3" },
+    { block: 1, condition: "lassoTool", taskId: "A-1x8" },
+    { block: 1, condition: "lassoTool", taskId: "A-2x4" },
+    // Lasso + Scattered (3 trials)
+    { block: 1, condition: "lassoTool", taskId: "B-3x3" },
+    { block: 1, condition: "lassoTool", taskId: "B-1x8" },
+    { block: 1, condition: "lassoTool", taskId: "B-2x4" },
+    // Baseline (Drag & Drop) + Clustered (3 trials)
+    { block: 1, condition: "baseline", taskId: "A-3x3" },
+    { block: 1, condition: "baseline", taskId: "A-1x8" },
+    { block: 1, condition: "baseline", taskId: "A-2x4" },
+    // Baseline (Drag & Drop) + Scattered (3 trials)
+    { block: 1, condition: "baseline", taskId: "B-3x3" },
+    { block: 1, condition: "baseline", taskId: "B-1x8" },
+    { block: 1, condition: "baseline", taskId: "B-2x4" },
+  ];
+
+  // Block 2 (Multi Page · 12 trials):
+  // Multi-page tasks from EXPERIMENT_TASKS (Conditions C & D) across both conditions.
+  const multiPageSeeds = EXPERIMENT_TASKS.filter((seed) => seed.pages > 1);
+  const block2: TrialPlanEntry[] = [];
+  for (const seed of multiPageSeeds) {
+    block2.push({ block: 2, condition: "baseline", taskId: seed.id as TaskId });
+    block2.push({ block: 2, condition: "lassoTool", taskId: seed.id as TaskId });
+  }
+
+  shuffleInPlace(block1);
+  shuffleInPlace(block2);
+
+  return [...block1, ...block2];
 }
 
 export async function getOrCreateTrialPlan(): Promise<TrialPlanEntry[]> {
@@ -243,18 +285,17 @@ export async function getOrCreateTrialPlan(): Promise<TrialPlanEntry[]> {
   if (stored) {
     try {
       const parsed = JSON.parse(stored);
-      // Only reuse the cached plan if it's still compatible with the current
-      // task registry (so removing/renaming a task auto-regenerates).
       if (
         Array.isArray(parsed) &&
-        parsed.length > 0 &&
+        parsed.length === 24 &&
         parsed.every(
           (e: unknown) =>
             e !== null &&
             typeof e === "object" &&
             "taskId" in e &&
             typeof (e as TrialPlanEntry).taskId === "string" &&
-            (e as TrialPlanEntry).taskId in TASKS,
+            (e as TrialPlanEntry).taskId in TASKS &&
+            ((e as TrialPlanEntry).block === 1 || (e as TrialPlanEntry).block === 2),
         )
       ) {
         return parsed as TrialPlanEntry[];
@@ -294,8 +335,6 @@ export async function isTaskActive(): Promise<boolean> {
   return (await AsyncStorage.getItem(ACTIVE_KEY)) === "1";
 }
 
-// Start timestamp (ms since epoch) of the active trial, or null if none.
-// Used by the on-screen timer; same value completeTask() uses for duration.
 export async function getStartTime(): Promise<number | null> {
   const [[, start], [, active]] = await AsyncStorage.multiGet([
     START_KEY,
@@ -337,7 +376,6 @@ export async function completeTask(args: {
   const spec = TASKS[current.trial.taskId];
   const passed = spec.validate(args.folders, args.pageOf);
 
-  // Timer keeps running unless the task is actually satisfied.
   if (!passed && args.outcomeOverride === undefined) return null;
 
   const outcome: Outcome =
@@ -348,7 +386,6 @@ export async function completeTask(args: {
 
   const selectedIds = args.folders.flatMap((f) => f.appIds);
 
-  // Compute page distribution for multi-page diagnostics.
   const pagesSet = new Set<number>();
   const perFolderPages: string[] = [];
   args.folders.forEach((f, idx) => {
@@ -364,6 +401,7 @@ export async function completeTask(args: {
 
   const log: TrialLog = {
     participantId,
+    block: current.trial.block,
     condition: current.trial.condition,
     taskId: current.trial.taskId,
     trialNumber: current.index + 1,
@@ -422,6 +460,7 @@ export async function clearAllExperimentData(): Promise<void> {
 export function toCsvRow(row: TrialLog): string {
   return [
     row.participantId,
+    row.block,
     row.condition,
     row.taskId,
     row.trialNumber,
@@ -438,6 +477,7 @@ export function toCsvRow(row: TrialLog): string {
 
 export const CSV_HEADERS = [
   "participant_id",
+  "block",
   "condition",
   "task_id",
   "trial_number",

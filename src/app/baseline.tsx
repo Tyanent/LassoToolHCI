@@ -540,36 +540,42 @@ export default function Index() {
   // ---------- Layout mode ----------
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
 
-  const applyLayout = (next: LayoutMode) => {
-    setLayoutMode(next);
-
-    // Remap positions for whichever pages the new layout affects.
-    setApps((prev) =>
-      prev.map((app) => {
-        const positions = positionsForPage(app.page, next);
-        if (!positions) return app;
-        const pos = positions.find((p) => p.id === app.id);
-        return pos ? { ...app, x: pos.x, y: pos.y } : app;
-      }),
-    );
+  const applyLayoutForApps = (
+    next: LayoutMode,
+    baseApps: AppIcon[],
+    baseFolders: Folder[],
+  ) => {
+    const nextApps = baseApps.map((app) => {
+      const positions = positionsForPage(app.page, next);
+      if (!positions) return app;
+      const pos = positions.find((p) => p.id === app.id);
+      return pos ? { ...app, x: pos.x, y: pos.y } : app;
+    });
 
     // Only grid leaves everything untouched; every other layout can hide
     // apps that fall outside its cell count.
-    if (rearrangesPages(next)) {
-      const isHidden = (app: AppIcon) => isHiddenByLayout(app, app.page, next);
-
-      setFolders((prev) =>
-        prev.filter((f) =>
-          f.appIds.every((id) => {
-            const targetApp = apps.find((a) => a.id === id);
-            return targetApp ? !isHidden(targetApp) : true;
-          }),
-        ),
-      );
-      setApps((prev) =>
-        prev.map((app) => (isHidden(app) ? { ...app, groupId: undefined } : app)),
-      );
+    if (!rearrangesPages(next)) {
+      setApps(nextApps);
+      setFolders(baseFolders);
+      return;
     }
+
+    const isHidden = (app: AppIcon) => isHiddenByLayout(app, app.page, next);
+    const hiddenIds = new Set(nextApps.filter(isHidden).map((a) => a.id));
+
+    setFolders(
+      baseFolders.filter((f) => f.appIds.every((id) => !hiddenIds.has(id))),
+    );
+    setApps(
+      nextApps.map((app) =>
+        hiddenIds.has(app.id) ? { ...app, groupId: undefined } : app,
+      ),
+    );
+  };
+
+  const applyLayout = (next: LayoutMode) => {
+    setLayoutMode(next);
+    applyLayoutForApps(next, apps, folders);
   };
 
   const cycleLayout = () => {
@@ -589,9 +595,7 @@ export default function Index() {
       const style = layoutStyleForTask(trial.trial.taskId);
       applyLayout(style === "clustered" ? "clustered" : "scattered-1");
 
-      if (pageStyleForTask(trial.trial.taskId) === "multi") {
-        setShowPager(true);
-      }
+      setShowPager(pageStyleForTask(trial.trial.taskId) === "multi");
     })();
     return () => {
       cancelled = true;
@@ -880,7 +884,8 @@ export default function Index() {
   }));
 
   // ---------- Page swipe ----------
-  const swipe = Gesture.Pan()
+const swipe = Gesture.Pan()
+    .enabled(showPager)
     .activeOffsetX([-20, 20])
     .failOffsetY([-15, 15])
     .onEnd((e) => {
@@ -912,16 +917,13 @@ export default function Index() {
   });
 
   const handleReset = () => {
-    setApps(
-      [
-        ...APPS.map((a) => ({ ...a, page: 1 })),
-        ...APPS_PAGE_2.map((a) => ({ ...a, page: 2 })),
-        ...APPS_PAGE_3.map((a) => ({ ...a, page: 3 })),
-      ].map((a) => ({ ...a, groupId: undefined })),
-    );
-    setFolders([]);
+    const resetApps = [
+      ...APPS.map((a) => ({ ...a, page: 1 })),
+      ...APPS_PAGE_2.map((a) => ({ ...a, page: 2 })),
+      ...APPS_PAGE_3.map((a) => ({ ...a, page: 3 })),
+    ].map((a) => ({ ...a, groupId: undefined }));
+
     groupIdCounter.current = 0;
-    setLayoutMode("grid");
     setPage(0);
     dragStartRef.current = null;
     dragHomeRef.current = null;
@@ -930,6 +932,7 @@ export default function Index() {
     hasFlippedRef.current = false;
     dragX.value = 0;
     dragY.value = 0;
+    applyLayoutForApps(layoutMode, resetApps, []);
   };
 
   const visibleFolders = folders.filter((f) => f.page === page + 1);
