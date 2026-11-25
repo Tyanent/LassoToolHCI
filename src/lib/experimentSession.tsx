@@ -145,6 +145,7 @@ export type TrialLog = {
   // Page distribution for multi-page tasks.
   pagesUsed: string; // e.g. "1|2"
   pagesInFolders: string; // e.g. "1:1-2|2:2"
+  reset_count: number;
 };
 
 const PARTICIPANT_KEY = "experiment_participant_id";
@@ -152,6 +153,7 @@ const PLAN_KEY = "experiment_trial_plan";
 const TRIAL_INDEX_KEY = "experiment_trial_index";
 const START_KEY = "experiment_start_time";
 const ACTIVE_KEY = "experiment_task_active";
+const RESET_COUNT_KEY = "experiment_reset_count";
 
 // ---------------------------------------------------------------------------
 // Task registry (built from EXPERIMENT_TASKS)
@@ -161,6 +163,24 @@ function buildTaskSpec(seed: TaskSeed): TaskSpec {
   const block = CONDITION_MATRIX[condition]?.block ?? (pages > 1 ? 2 : 1);
   const total = folders * appsPerFolder;
   const multiPage = pages > 1;
+
+  const brief = (() => {
+    if (pages === 3) {
+      return folders === 1
+        ? `Create 1 folder containing exactly ${appsPerFolder} apps, with one app from each page.`
+        : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total), with one app from each page.`;
+    }
+
+    if (multiPage) {
+      return folders === 1
+        ? `Create 1 folder containing exactly ${appsPerFolder} apps, with at least one app taken from a different page.`
+        : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total). At least one folder must contain apps drawn from more than one page.`;
+    }
+
+    return folders === 1
+      ? `Create 1 folder containing exactly ${appsPerFolder} apps.`
+      : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total).`;
+  })();
 
   return {
     id: id as TaskId,
@@ -175,13 +195,7 @@ function buildTaskSpec(seed: TaskSeed): TaskSpec {
       : folders === 1
         ? `1 folder × ${appsPerFolder} apps`
         : `${folders} folders × ${appsPerFolder} apps each`,
-    brief: multiPage
-      ? folders === 1
-        ? `Create 1 folder containing exactly ${appsPerFolder} apps, with at least one app taken from a different page.`
-        : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total). At least one folder must contain apps drawn from more than one page.`
-      : folders === 1
-        ? `Create 1 folder containing exactly ${appsPerFolder} apps.`
-        : `Create ${folders} folders, each containing exactly ${appsPerFolder} apps (${total} apps total).`,
+    brief,
     validate: (finalFolders, pageOf) => {
       // Shape check: correct count and sizes.
       const shapeOk =
@@ -243,9 +257,8 @@ function shuffleInPlace<T>(items: T[]): T[] {
 
 async function generateTrialPlan(): Promise<TrialPlanEntry[]> {
   // Block 1 (Single Page · 12 trials):
-  //   - Condition A (Clustered, Single Page): 3 trials (1 baseline, 2 lassoTool / or paired)
-  //   - Condition B (Scattered, Single Page): 3 trials
-  // To guarantee exact 3 trials per single-page condition and 12 trials per block:
+  //   - Condition A (Clustered, Single Page): 3 trials per condition
+  //   - Condition B (Scattered, Single Page): 3 trials per condition
   const block1: TrialPlanEntry[] = [
     // Lasso + Clustered (3 trials)
     { block: 1, condition: "lassoTool", taskId: "A-3x3" },
@@ -266,13 +279,26 @@ async function generateTrialPlan(): Promise<TrialPlanEntry[]> {
   ];
 
   // Block 2 (Multi Page · 12 trials):
-  // Multi-page tasks from EXPERIMENT_TASKS (Conditions C & D) across both conditions.
-  const multiPageSeeds = EXPERIMENT_TASKS.filter((seed) => seed.pages > 1);
-  const block2: TrialPlanEntry[] = [];
-  for (const seed of multiPageSeeds) {
-    block2.push({ block: 2, condition: "baseline", taskId: seed.id as TaskId });
-    block2.push({ block: 2, condition: "lassoTool", taskId: seed.id as TaskId });
-  }
+  //   - Condition C (Clustered, Multi Page): 3 trials per condition
+  //   - Condition D (Scattered, Multi Page): 3 trials per condition
+  const block2: TrialPlanEntry[] = [
+    // Lasso + Clustered Multi-Page (3 trials)
+    { block: 2, condition: "lassoTool", taskId: "C-1x4-cross" },
+    { block: 2, condition: "lassoTool", taskId: "C-2x3-cross" },
+    { block: 2, condition: "lassoTool", taskId: "C-1x3-cross3" },
+    // Lasso + Scattered Multi-Page (3 trials)
+    { block: 2, condition: "lassoTool", taskId: "D-1x4-cross" },
+    { block: 2, condition: "lassoTool", taskId: "D-2x3-cross" },
+    { block: 2, condition: "lassoTool", taskId: "D-1x3-cross3" },
+    // Baseline (Drag & Drop) + Clustered Multi-Page (3 trials)
+    { block: 2, condition: "baseline", taskId: "C-1x4-cross" },
+    { block: 2, condition: "baseline", taskId: "C-2x3-cross" },
+    { block: 2, condition: "baseline", taskId: "C-1x3-cross3" },
+    // Baseline (Drag & Drop) + Scattered Multi-Page (3 trials)
+    { block: 2, condition: "baseline", taskId: "D-1x4-cross" },
+    { block: 2, condition: "baseline", taskId: "D-2x3-cross" },
+    { block: 2, condition: "baseline", taskId: "D-1x3-cross3" },
+  ];
 
   shuffleInPlace(block1);
   shuffleInPlace(block2);
@@ -321,6 +347,18 @@ export async function getCurrentTrial(): Promise<{
   return { index: idx, total: plan.length, trial: plan[idx] };
 }
 
+export async function recordReset(): Promise<number> {
+  const currentStr = await AsyncStorage.getItem(RESET_COUNT_KEY);
+  const next = (currentStr ? Number(currentStr) : 0) + 1;
+  await AsyncStorage.setItem(RESET_COUNT_KEY, String(next));
+  return next;
+}
+
+export async function getResetCount(): Promise<number> {
+  const currentStr = await AsyncStorage.getItem(RESET_COUNT_KEY);
+  return currentStr ? Number(currentStr) : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Timer / active flag
 // ---------------------------------------------------------------------------
@@ -328,6 +366,7 @@ export async function startTimer(): Promise<void> {
   await AsyncStorage.multiSet([
     [START_KEY, String(Date.now())],
     [ACTIVE_KEY, "1"],
+    [RESET_COUNT_KEY, "0"],
   ]);
 }
 
@@ -385,7 +424,7 @@ export async function completeTask(args: {
   const participantId = await getOrCreateParticipantId();
 
   const selectedIds = args.folders.flatMap((f) => f.appIds);
-
+  
   const pagesSet = new Set<number>();
   const perFolderPages: string[] = [];
   args.folders.forEach((f, idx) => {
@@ -398,6 +437,8 @@ export async function completeTask(args: {
     const sorted = [...fps].sort((a, b) => a - b);
     perFolderPages.push(`${idx + 1}:${sorted.join("-")}`);
   });
+
+  const reset_count = await getResetCount();
 
   const log: TrialLog = {
     participantId,
@@ -413,6 +454,7 @@ export async function completeTask(args: {
     selectedIds: selectedIds.join("|"),
     pagesUsed: [...pagesSet].sort((a, b) => a - b).join("|"),
     pagesInFolders: perFolderPages.join("|"),
+    reset_count,
   };
 
   const existing = await AsyncStorage.getItem("experiment_logs");
@@ -449,6 +491,7 @@ export async function clearAllExperimentData(): Promise<void> {
     TRIAL_INDEX_KEY,
     START_KEY,
     ACTIVE_KEY,
+    RESET_COUNT_KEY,
     "experiment_last_log",
     "experiment_logs",
   ]);
@@ -470,6 +513,7 @@ export function toCsvRow(row: TrialLog): string {
     row.outcome,
     row.targetId,
     row.selectedIds,
+    row.reset_count,
     row.pagesUsed,
     row.pagesInFolders,
   ].join(",");
@@ -487,6 +531,7 @@ export const CSV_HEADERS = [
   "outcome",
   "target_id",
   "selected_ids",
+  "reset_count",
   "pages_used",
   "pages_in_folders",
 ];

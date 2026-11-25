@@ -20,6 +20,7 @@ import {
   isTaskSatisfied,
   layoutStyleForTask,
   pageStyleForTask,
+  recordReset,
 } from "../lib/experimentSession";
 // ---------- Layout ----------
 const height = 890;
@@ -917,6 +918,7 @@ const swipe = Gesture.Pan()
   });
 
   const handleReset = () => {
+    void recordReset();
     const resetApps = [
       ...APPS.map((a) => ({ ...a, page: 1 })),
       ...APPS_PAGE_2.map((a) => ({ ...a, page: 2 })),
@@ -952,25 +954,8 @@ const swipe = Gesture.Pan()
           <ExperimentTimer />
 
           <View style={styles.chipColumn} pointerEvents="box-none">
-            {SHOW_LAYOUT_TOGGLE && page === 0 && (//Toggle Dev Buttons **REMOVE LATER
-              <TouchableOpacity
-                style={styles.layoutToggle}
-                onPress={cycleLayout}
-              >
-                <Text style={styles.layoutToggleText}>
-                  Layout: {LAYOUT_LABEL[layoutMode]}
-                </Text>
-              </TouchableOpacity>
-            )}
 
-            <TouchableOpacity
-              style={styles.layoutToggle}
-              onPress={() => setShowPager((v) => !v)}
-            >
-              <Text style={styles.layoutToggleText}>
-                Pager: {showPager ? "On" : "Off"}
-              </Text>
-            </TouchableOpacity>
+           
           </View>
 
           {visibleApps.map((app) => (
@@ -1155,17 +1140,6 @@ const styles = StyleSheet.create({
     left: 12,
     gap: 6,
     zIndex: 50,
-  },
-  layoutToggle: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.55)",
-  },
-  layoutToggleText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "700",
   },
   pagerBar: {
     position: "absolute",

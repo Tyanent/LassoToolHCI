@@ -23,6 +23,7 @@ import {
   isTaskSatisfied,
   layoutStyleForTask,
   pageStyleForTask,
+  recordReset,
 } from "../lib/experimentSession";
 // SVG container dimensions
 const height = 890;
@@ -767,6 +768,7 @@ export default function Index() {
   };
 
   const ungroupSelectedApps = () => {
+    void recordReset();
     const resetApps = [
       ...APPS.map((a) => ({ ...a, page: 1 })),
       ...APPS_PAGE_2.map((a) => ({ ...a, page: 2 })),
@@ -901,20 +903,7 @@ export default function Index() {
 
         {/*Dev Toggle Buttons for Layout and Pager REMOVE LATER*/}
         <View style={styles.toggleRow}>
-          <TouchableOpacity style={styles.toggleButton} onPress={cycleLayout}>
-            <Text style={styles.toggleText}>
-              Layout: {LAYOUT_LABEL[layoutMode]}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.toggleButton}
-            onPress={() => setShowPager((v) => !v)}
-          >
-            <Text style={styles.toggleText}>
-              Pager: {showPager ? "On" : "Off"}
-            </Text>
-          </TouchableOpacity>
+          
         </View>
 
         <Animated.View
