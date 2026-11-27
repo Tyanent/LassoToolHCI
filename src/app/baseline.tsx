@@ -728,42 +728,39 @@ export default function Index() {
     dragX.value = deltaX;
     dragY.value = deltaY;
 
-    const iconLeft = home.x + deltaX;
-    const iconRight = iconLeft + home.size;
+    const centerX = home.x + home.size / 2 + deltaX;
     const centerY = home.y + home.size / 2 + deltaY;
 
-    const pastLeftEdge = iconLeft <= 0;
-    const pastRightEdge = iconRight >= width;
+    const CENTER_MIN = 60;
+    const CENTER_MAX = width - 60;
 
-    // Only cancel a pending flip once the icon is fully back on-screen.
-    const fullyOnScreen = iconLeft > 0 && iconRight < width;
-
-    if (fullyOnScreen) {
+    if (centerX >= CENTER_MIN && centerX <= CENTER_MAX) {
       hasFlippedRef.current = false;
-      if (edgeTimerRef.current) {
-        clearTimeout(edgeTimerRef.current);
-        edgeTimerRef.current = null;
-      }
     }
 
-    if (pastLeftEdge && home.page - 1 > 0) {
+    if (centerX <= 0 && home.page - 1 > 0) {
       if (!hasFlippedRef.current && !edgeTimerRef.current) {
         edgeTimerRef.current = setTimeout(() => {
           handlePageSwitchDuringDrag(home.page - 2, absX, absY, id);
           edgeTimerRef.current = null;
         }, 400);
       }
-    } else if (pastRightEdge && home.page - 1 < PAGE_COUNT - 1) {
+    } else if (centerX >= width && home.page - 1 < PAGE_COUNT - 1) {
       if (!hasFlippedRef.current && !edgeTimerRef.current) {
         edgeTimerRef.current = setTimeout(() => {
           handlePageSwitchDuringDrag(home.page, absX, absY, id);
           edgeTimerRef.current = null;
         }, 400);
       }
+    } else {
+      if (edgeTimerRef.current && centerX > 0 && centerX < width) {
+        clearTimeout(edgeTimerRef.current);
+        edgeTimerRef.current = null;
+      }
     }
 
     const target = findDropTarget(
-      home.x + home.size / 2 + deltaX,
+      centerX,
       centerY,
       apps,
       folders,
