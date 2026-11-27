@@ -17,6 +17,7 @@ import ExperimentTimer from "../components/ExperimentTimer";
 import {
   completeTask,
   getCurrentTrial,
+  isTaskActive,
   isTaskSatisfied,
   layoutStyleForTask,
   pageStyleForTask,
@@ -591,8 +592,18 @@ export default function Index() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const trial = await getCurrentTrial();
-      if (cancelled || !trial) return;
+      const [trial, active] = await Promise.all([
+      getCurrentTrial(),
+      isTaskActive(),
+    ]);
+      if (cancelled) return;
+
+       if (!trial || !active) {
+      // No active experiment → full grid + pager, regardless of prior state.
+        applyLayout("grid");
+        setShowPager(true);
+        return;
+      }
       const style = layoutStyleForTask(trial.trial.taskId);
       applyLayout(style === "clustered" ? "clustered" : "scattered-1");
 

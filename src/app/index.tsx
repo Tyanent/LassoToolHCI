@@ -20,10 +20,11 @@ import ExperimentTimer from "../components/ExperimentTimer";
 import {
   completeTask,
   getCurrentTrial,
+  isTaskActive,
   isTaskSatisfied,
   layoutStyleForTask,
   pageStyleForTask,
-  recordReset,
+  recordReset
 } from "../lib/experimentSession";
 // SVG container dimensions
 const height = 890;
@@ -594,8 +595,18 @@ export default function Index() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const trial = await getCurrentTrial();
-      if (cancelled || !trial) return;
+      const [trial, active] = await Promise.all([
+      getCurrentTrial(),
+      isTaskActive(),
+    ]);
+      if (cancelled) return;
+      
+      if (!trial||!active) {
+        // No active experiment → full grid + pager, regardless of prior state.
+        applyLayout("grid");
+        setShowPager(true);
+        return;
+      }
       const style = layoutStyleForTask(trial.trial.taskId);
       applyLayout(style === "clustered" ? "clustered" : "scattered-1");
 
@@ -608,7 +619,7 @@ export default function Index() {
   }, []);
   // ─────────────────────────────────────────────────────────
 
-  const [showPager, setShowPager] = useState(false);
+  const [showPager, setShowPager] = useState(true);
   const [page, setPage] = useState<0 | 1 | 2>(0);
 
   const goToPage = (next: number) => {
@@ -636,36 +647,36 @@ export default function Index() {
   };
 
   const finishLasso = () => {
-    const polygon = pathRef.current;
-    pathRef.current = [];
-    setCurrentPath([]);
+  const polygon = pathRef.current;
+  pathRef.current = [];
+  setCurrentPath([]);
 
-    if (polygon.length < 3) return;
+  if (polygon.length < 3) return;
 
-    // Lassos only apps visible on the current page.
-    const pageIds = new Set(visibleApps.map((a) => a.id));
+  const pageIds = new Set(visibleApps.map((a) => a.id));
 
-    const insideIds = apps
-      .filter((app) => !app.groupId && pageIds.has(app.id))
-      .filter((app) =>
-        pointInPolygon(
-          { x: app.x + app.size / 2, y: app.y + app.size / 2 },
-          polygon,
-        ),
-      )
-      .map((app) => app.id);
+  const insideIds = apps
+    .filter((app) => !app.groupId && pageIds.has(app.id))
+    .filter((app) =>
+      pointInPolygon(
+        { x: app.x + app.size / 2, y: app.y + app.size / 2 },
+        polygon,
+      ),
+    )
+    .map((app) => app.id);
 
-    if (insideIds.length === 0) return;
+  if (insideIds.length === 0) return;
 
-    setSelectedIds((previous) => {
-      const next = new Set(previous);
-      for (const id of insideIds) {
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-      }
-      return [...next];
-    });
-  };
+  setSelectedIds((previous) => {
+    const next = [...previous];
+    for (const id of insideIds) {
+      const idx = next.indexOf(id);
+      if (idx >= 0) next.splice(idx, 1);  // deselect, don't reorder others
+      else next.push(id);                 // append → chronological order
+    }
+    return next;
+  });
+};
 
   const drag = Gesture.Pan()
     .onStart((event) => {
@@ -708,39 +719,42 @@ export default function Index() {
   };
 
   const groupSelectedApps = async () => {
-    const selectedApps = apps.filter((app) => selectedIds.includes(app.id));
+  if (selectedIds.length <= 1) {
+    showMessage();
+    return;
+  }
 
-    if (selectedApps.length <= 1) {
-      console.log("Not enough apps selected to form a group.");
-      showMessage();
-      return;
-    }
+  // Preserve selection order; anchor = first lassoed app.
+  const selectedApps = selectedIds
+    .map((id) => apps.find((a) => a.id === id))
+    .filter((a): a is AppIcon => !!a);
 
-    const groupId = `group-${groupIdCounter.current++}`;
-    console.log(`Created group ${groupId} with`, selectedIds);
+  if (selectedApps.length <= 1) {
+    showMessage();
+    return;
+  }
 
-    setApps((previous) =>
-      previous.map((app) =>
-        selectedIds.includes(app.id) ? { ...app, groupId } : app,
-      ),
-    );
+  const anchorApp = selectedApps[0];  // first selected, any page
 
-    // Folder is placed on the page of the first selected app. Its appIds
-    // may span pages — this is what allows multi-page tasks to complete.
-    const firstApp = selectedApps[0];
-    if (!firstApp) return;
+  const groupId = `group-${groupIdCounter.current++}`;
 
-    const newFolder: Folder = {
-      id: groupId,
-      label: `Folder ${groupIdCounter.current}`,
-      x: firstApp.x,
-      y: firstApp.y,
-      size: iconSize,
-      containerHeight: iconSize + LabelHeight,
-      appIds: selectedIds,
-      open: false,
-      page: firstApp.page,
-    };
+  setApps((previous) =>
+    previous.map((app) =>
+      selectedIds.includes(app.id) ? { ...app, groupId } : app,
+    ),
+  );
+
+  const newFolder: Folder = {
+    id: groupId,
+    label: `Folder ${groupIdCounter.current}`,
+    x: anchorApp.x,
+    y: anchorApp.y,
+    size: iconSize,
+    containerHeight: iconSize + LabelHeight,
+    appIds: selectedIds,          // order preserved too
+    open: false,
+    page: anchorApp.page,         // ← folder lives on anchor's page
+  };
 
     const nextFolders = [...folders, newFolder];
     setFolders(nextFolders);
