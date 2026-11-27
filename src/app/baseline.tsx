@@ -731,8 +731,8 @@ export default function Index() {
     const centerX = home.x + home.size / 2 + deltaX;
     const centerY = home.y + home.size / 2 + deltaY;
 
-    const CENTER_MIN = 60;
-    const CENTER_MAX = width - 60;
+    const CENTER_MIN = 30;
+    const CENTER_MAX = width - 30;
 
     if (centerX >= CENTER_MIN && centerX <= CENTER_MAX) {
       hasFlippedRef.current = false;
