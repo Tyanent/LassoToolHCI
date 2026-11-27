@@ -632,6 +632,13 @@ export default function Index() {
     baseAbsY: number;
   } | null>(null);
 
+    const dragOriginRef = useRef<{
+      id: string;
+      page: number;
+      x: number;
+      y: number;
+    } | null>(null);   
+
   const dragStartRef = useRef<{ absX: number; absY: number } | null>(null);
   const edgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFlippedRef = useRef<boolean>(false);
@@ -652,6 +659,13 @@ export default function Index() {
       size: app.size,
       baseAbsX: absX,
       baseAbsY: absY,
+    };
+
+    dragOriginRef.current = {
+      id,
+      page: app.page,
+      x: app.x,
+      y: app.y,
     };
     dragX.value = 0;
     dragY.value = 0;
@@ -788,6 +802,7 @@ export default function Index() {
       setHoverTarget(null);
       dragX.value = 0;
       dragY.value = 0;
+      dragOriginRef.current = null;
       return;
     }
 
@@ -854,17 +869,33 @@ export default function Index() {
       }
     }
 
-    if (!handledAsFolderOp) {
-      // Free drop — commit the landing page and position.
-      const finalX = Math.max(0, Math.min(width - iconSize, home.x + deltaX));
-      const finalY = Math.max(0, Math.min(height - 200, home.y + deltaY));
-      setApps((prev) =>
-        prev.map((a) =>
-          a.id === id ? { ...a, x: finalX, y: finalY, page: currentPage } : a,
-        ),
-      );
-    }
-
+        if (!handledAsFolderOp) {
+          const origin = dragOriginRef.current;
+          if (origin && origin.id === id) {
+            // No valid drop target → snap back to the slot the drag started from.
+            setApps((prev) =>
+              prev.map((a) =>
+                a.id === id
+                  ? { ...a, x: origin.x, y: origin.y, page: origin.page }
+                  : a,
+              ),
+            );
+            // If the drag edge-flipped to another page, follow it back so the
+            // icon is visible again.
+            if (origin.page !== page + 1) {
+              setPage((origin.page - 1) as 0 | 1 | 2);
+            }
+          } else {
+            // Fallback: clamp to screen.
+            const finalX = Math.max(0, Math.min(width - iconSize, home.x + deltaX));
+            const finalY = Math.max(0, Math.min(height - 200, home.y + deltaY));
+            setApps((prev) =>
+              prev.map((a) =>
+                a.id === id ? { ...a, x: finalX, y: finalY, page: currentPage } : a,
+              ),
+            );
+          }
+        }
     const pageOfHelper = (appId: string) => {
       const found = apps.find((a) => a.id === appId);
       return found ? found.page : 1;
@@ -889,6 +920,7 @@ export default function Index() {
     setHoverTarget(null);
     dragX.value = 0;
     dragY.value = 0;
+    dragOriginRef.current = null;
   };
 
   const floatingAnimatedStyle = useAnimatedStyle(() => ({
@@ -940,6 +972,7 @@ const swipe = Gesture.Pan()
     setPage(0);
     dragStartRef.current = null;
     dragHomeRef.current = null;
+    dragOriginRef.current = null;
     setDraggingId(null);
     setHoverTarget(null);
     hasFlippedRef.current = false;
